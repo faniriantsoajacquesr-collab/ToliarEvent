@@ -992,6 +992,7 @@ router.get('/organization-members', async (req, res) => {
     let query = db.from('organization_members').select('id,organization_id,profile_id,role,is_validated,created_at,profiles(id,first_name,last_name,phone)').eq('organization_id', organization_id);
 
     if (filter === 'pending') query = query.eq('is_validated', false);
+    if (filter === 'validated') query = query.eq('is_validated', true);
 
     if (q && typeof q === 'string') {
       // search by profile name
@@ -1008,6 +1009,79 @@ router.get('/organization-members', async (req, res) => {
   }
 });
 
+
+/**
+ * POST /api/auth/organization-members/bulk-action
+ * Body: { member_ids: number[], action: 'validate'|'reject'|'delete' }
+ */
+router.post('/organization-members/bulk-action', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { member_ids, action } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!Array.isArray(member_ids) || member_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'member_ids requis (tableau non vide)' });
+    }
+    if (!['validate', 'reject', 'delete'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'Action invalide' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) return res.status(401).json({ success: false, error: 'Authentification invalide' });
+
+    const db = supabase.createClientWithAuth(access_token);
+    const ids = member_ids.map(Number).filter((id) => Number.isFinite(id));
+
+    const { data: members, error: fetchErr } = await db
+      .from('organization_members')
+      .select('id, organization_id')
+      .in('id', ids);
+
+    if (fetchErr) return res.status(400).json({ success: false, error: fetchErr.message });
+    if (!members?.length) return res.status(404).json({ success: false, error: 'Aucun membre trouvé' });
+
+    const orgIds = [...new Set(members.map((m) => m.organization_id))];
+    for (const orgId of orgIds) {
+      const { data: adminRows } = await db
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', orgId)
+        .eq('profile_id', authData.user.id)
+        .limit(1);
+      if (!adminRows?.length || adminRows[0].role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Accès refusé: administrateur requis' });
+      }
+    }
+
+    const memberIds = members.map((m) => m.id);
+
+    if (action === 'validate') {
+      const { error: updateError } = await db
+        .from('organization_members')
+        .update({ is_validated: true })
+        .in('id', memberIds);
+      if (updateError) return res.status(400).json({ success: false, error: updateError.message });
+      return res.json({
+        success: true,
+        message: `${memberIds.length} membre(s) validé(s) avec succès.`,
+        processed_count: memberIds.length,
+      });
+    }
+
+    const { error: deleteError } = await db.from('organization_members').delete().in('id', memberIds);
+    if (deleteError) return res.status(400).json({ success: false, error: deleteError.message });
+
+    return res.json({
+      success: true,
+      message: `${memberIds.length} membre(s) ${action === 'reject' ? 'refusé(s)' : 'supprimé(s)'} avec succès.`,
+      processed_count: memberIds.length,
+    });
+  } catch (error) {
+    console.error('Erreur POST organization-members/bulk-action:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors de l\'action groupée sur les membres' });
+  }
+});
 
 /**
  * PATCH /api/auth/organization-members/:id
@@ -1795,6 +1869,39 @@ router.post('/apply-event', async (req, res) => {
 
     const db = supabase.createClientWithAuth(access_token);
 
+    const { data: existingRows, error: existingError } = await db
+      .from('event_staff')
+      .select('id, status')
+      .eq('event_id', event_id)
+      .eq('profile_id', authData.user.id)
+      .limit(1);
+
+    if (existingError) return res.status(400).json({ success: false, error: existingError.message });
+
+    if (existingRows?.length) {
+      const existing = existingRows[0];
+      const status = String(existing.status || '').toLowerCase();
+
+      if (status === 'valide' || status === 'valid' || status === 'accepted') {
+        return res.status(400).json({ success: false, error: 'Vous participez déjà à cet événement.' });
+      }
+      if (status === 'en_attente' || status === 'pending') {
+        return res.status(400).json({ success: false, error: 'Votre candidature est déjà en attente de validation.' });
+      }
+      if (status === 'refuse' || status === 'rejected' || status.includes('refus')) {
+        const { data: retried, error: retryError } = await db
+          .from('event_staff')
+          .update({ status: 'en_attente' })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (retryError) return res.status(400).json({ success: false, error: retryError.message });
+        return res.json({ success: true, application: retried, retried: true });
+      }
+
+      return res.status(400).json({ success: false, error: 'Candidature déjà existante pour cet événement.' });
+    }
+
     const { data: applied, error: applyError } = await db
       .from('event_staff')
       .insert({ event_id, profile_id: authData.user.id, status: 'en_attente' })
@@ -1806,6 +1913,85 @@ router.post('/apply-event', async (req, res) => {
   } catch (error) {
     console.error('Erreur apply-event:', error);
     res.status(500).json({ success: false, error: 'Erreur lors de la candidature' });
+  }
+});
+
+/**
+ * POST /api/auth/event-staff/bulk-action
+ * Body: { application_ids: number[], action: 'accept'|'reject'|'delete' }
+ */
+router.post('/event-staff/bulk-action', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { application_ids, action } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!Array.isArray(application_ids) || application_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'application_ids requis (tableau non vide)' });
+    }
+    if (!['accept', 'reject', 'delete'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'Action invalide' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) return res.status(401).json({ success: false, error: 'Authentification invalide' });
+
+    const db = supabase.createClientWithAuth(access_token);
+    const dbAdmin = supabase.admin || supabase;
+    const ids = application_ids.map(Number).filter((id) => Number.isFinite(id));
+
+    const { data: applications, error: appsError } = await dbAdmin
+      .from('event_staff')
+      .select('id, event_id')
+      .in('id', ids);
+
+    if (appsError) return res.status(400).json({ success: false, error: appsError.message });
+    if (!applications?.length) return res.status(404).json({ success: false, error: 'Aucune candidature trouvée' });
+
+    const eventIds = [...new Set(applications.map((a) => a.event_id))];
+    for (const eventId of eventIds) {
+      const { data: eventRows, error: eventError } = await db.from('events').select('organization_id').eq('id', eventId).limit(1);
+      if (eventError || !eventRows?.length) {
+        return res.status(404).json({ success: false, error: 'Événement introuvable' });
+      }
+      const { data: memberRows } = await dbAdmin
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', eventRows[0].organization_id)
+        .eq('profile_id', authData.user.id)
+        .limit(1);
+      if (!memberRows?.length || memberRows[0].role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Accès refusé' });
+      }
+    }
+
+    const applicationIds = applications.map((a) => a.id);
+
+    if (action === 'delete') {
+      const { error: deleteError } = await dbAdmin.from('event_staff').delete().in('id', applicationIds);
+      if (deleteError) return res.status(400).json({ success: false, error: deleteError.message });
+      return res.json({
+        success: true,
+        message: `${applicationIds.length} candidature(s) supprimée(s) avec succès.`,
+        processed_count: applicationIds.length,
+      });
+    }
+
+    const newStatus = action === 'accept' ? 'valide' : 'refuse';
+    const { error: updateError } = await dbAdmin
+      .from('event_staff')
+      .update({ status: newStatus })
+      .in('id', applicationIds);
+    if (updateError) return res.status(400).json({ success: false, error: updateError.message });
+
+    return res.json({
+      success: true,
+      message: `${applicationIds.length} candidature(s) ${action === 'accept' ? 'validée(s)' : 'refusée(s)'} avec succès.`,
+      processed_count: applicationIds.length,
+    });
+  } catch (error) {
+    console.error('Erreur POST event-staff/bulk-action:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors de l\'action groupée sur les candidatures' });
   }
 });
 
@@ -1905,6 +2091,58 @@ router.delete('/event-staff/:id', async (req, res) => {
   } catch (error) {
     console.error('Erreur delete event_staff:', error);
     return res.status(500).json({ success: false, error: 'Erreur lors de la suppression de la candidature' });
+  }
+});
+
+/**
+ * POST /api/auth/event-staff/my/:id/retry
+ * Permet à un utilisateur de relancer sa candidature refusée (status → en_attente)
+ */
+router.post('/event-staff/my/:id/retry', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const id = Number(req.params.id);
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!Number.isFinite(id)) return res.status(400).json({ success: false, error: 'Identifiant invalide' });
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) return res.status(401).json({ success: false, error: 'Authentification invalide' });
+
+    const db = supabase.createClientWithAuth(access_token);
+
+    const { data: rows, error: fetchErr } = await db.from('event_staff').select('*').eq('id', id).limit(1);
+    if (fetchErr) return res.status(400).json({ success: false, error: fetchErr.message });
+    if (!rows?.length) return res.status(404).json({ success: false, error: 'Candidature introuvable' });
+
+    const application = rows[0];
+
+    if (application.profile_id !== authData.user.id) {
+      return res.status(403).json({ success: false, error: 'Accès refusé' });
+    }
+
+    const status = String(application.status || '').toLowerCase();
+    if (!(status === 'refuse' || status === 'rejected' || status.includes('refus'))) {
+      return res.status(400).json({ success: false, error: 'Seules les candidatures refusées peuvent être relancées.' });
+    }
+
+    const { data: updated, error: updateError } = await db
+      .from('event_staff')
+      .update({ status: 'en_attente' })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) return res.status(400).json({ success: false, error: updateError.message });
+
+    return res.json({
+      success: true,
+      application: updated,
+      message: 'Candidature renvoyée pour validation.',
+    });
+  } catch (error) {
+    console.error('Erreur POST event-staff/my retry:', error);
+    return res.status(500).json({ success: false, error: 'Erreur lors de la relance de la candidature' });
   }
 });
 
@@ -2417,6 +2655,60 @@ router.get('/my-applications', async (req, res) => {
   }
 });
 
+function sanitizeTicketSearchInput(raw) {
+  return String(raw).trim().replace(/^#/, '').replace(/[,().%\\]/g, '');
+}
+
+function filterTicketIdsBySearch(tickets, search) {
+  const cleaned = sanitizeTicketSearchInput(search);
+  if (!cleaned) return tickets.map((ticket) => ticket.id);
+
+  const searchLower = cleaned.toLowerCase();
+  const hexSearch = searchLower.replace(/-/g, '');
+
+  return tickets
+    .filter((ticket) => {
+      const holderMatch = (ticket.holder_name || '').toLowerCase().includes(searchLower);
+      const typeMatch = (ticket.ticket_type || '').toLowerCase().includes(searchLower);
+      const idMatch = ticket.id.replace(/-/g, '').toLowerCase().includes(hexSearch);
+      const numberMatch = /^\d+$/.test(cleaned) && ticket.number === parseInt(cleaned, 10);
+
+      const sellerProfile = ticket.sold_by_profile;
+      const sellerFirstName = (sellerProfile?.first_name || '').toLowerCase();
+      const sellerLastName = (sellerProfile?.last_name || '').toLowerCase();
+      const sellerFullName = `${sellerFirstName} ${sellerLastName}`.trim();
+      const sellerMatch =
+        sellerFirstName.includes(searchLower) ||
+        sellerLastName.includes(searchLower) ||
+        sellerFullName.includes(searchLower);
+
+      return holderMatch || typeMatch || idMatch || numberMatch || sellerMatch;
+    })
+    .map((ticket) => ticket.id);
+}
+
+async function resolveTicketSearchIds(db, eventId, ticketType, search) {
+  let lookupQuery = db
+    .from('tickets')
+    .select(`
+      id,
+      holder_name,
+      ticket_type,
+      number,
+      sold_by_profile:profiles!tickets_sold_by_fkey(first_name, last_name)
+    `)
+    .eq('event_id', eventId);
+
+  if (ticketType && ticketType !== 'all') {
+    lookupQuery = lookupQuery.eq('ticket_type', ticketType);
+  }
+
+  const { data: searchableTickets, error } = await lookupQuery;
+  if (error) throw error;
+
+  return filterTicketIdsBySearch(searchableTickets || [], search);
+}
+
 /**
  * GET /api/auth/tickets
  * Query: ?event_id=UUID
@@ -2435,6 +2727,37 @@ router.get('/tickets', async (req, res) => {
 
     const db = supabase.createClientWithAuth(access_token);
 
+    const { ticket_type } = req.query;
+
+    if (search) {
+      const cleaned = sanitizeTicketSearchInput(search);
+      if (cleaned) {
+        try {
+          const matchingIds = await resolveTicketSearchIds(db, event_id, ticket_type, search);
+          if (matchingIds.length === 0) {
+            return res.json({ success: true, tickets: [] });
+          }
+
+          let query = db
+            .from('tickets')
+            .select(`
+              *,
+              sold_by_profile:profiles!tickets_sold_by_fkey(first_name, last_name),
+              scanned_by_profile:profiles!tickets_scanned_by_fkey(first_name, last_name)
+            `)
+            .eq('event_id', event_id)
+            .in('id', matchingIds);
+
+          const { data: tickets, error: ticketsError } = await query.order('created_at', { ascending: false });
+          if (ticketsError) return res.status(400).json({ success: false, error: ticketsError.message });
+          return res.json({ success: true, tickets });
+        } catch (searchError) {
+          console.error('Erreur recherche tickets:', searchError);
+          return res.status(400).json({ success: false, error: searchError.message || 'Erreur lors de la recherche' });
+        }
+      }
+    }
+
     let query = db
       .from('tickets')
       .select(`
@@ -2442,15 +2765,10 @@ router.get('/tickets', async (req, res) => {
         sold_by_profile:profiles!tickets_sold_by_fkey(first_name, last_name),
         scanned_by_profile:profiles!tickets_scanned_by_fkey(first_name, last_name)
       `)
-      .eq('event_id', event_id)
+      .eq('event_id', event_id);
 
-    if (search) {
-      const searchTerm = `%${search}%`;
-      query = query.or(
-        `id.ilike.${searchTerm},holder_name.ilike.${searchTerm},` +
-        `sold_by_profile.first_name.ilike.${searchTerm},sold_by_profile.last_name.ilike.${searchTerm},` +
-        `scanned_by_profile.first_name.ilike.${searchTerm},scanned_by_profile.last_name.ilike.${searchTerm}`
-      );
+    if (ticket_type && ticket_type !== 'all') {
+      query = query.eq('ticket_type', ticket_type);
     }
 
     const { data: tickets, error: ticketsError } = await query.order('created_at', { ascending: false });
@@ -2461,6 +2779,166 @@ router.get('/tickets', async (req, res) => {
   } catch (error) {
     console.error('Erreur GET tickets:', error);
     res.status(500).json({ success: false, error: 'Erreur lors de la récupération des billets' });
+  }
+});
+
+/**
+ * POST /api/auth/tickets/bulk-delete
+ * Body: { ticket_ids: string[] }
+ * Supprime plusieurs billets (admin requis)
+ */
+router.post('/tickets/bulk-delete', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { ticket_ids } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!Array.isArray(ticket_ids) || ticket_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'ticket_ids requis (tableau non vide)' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) return res.status(401).json({ success: false, error: 'Authentification invalide' });
+
+    const db = supabase.createClientWithAuth(access_token);
+
+    const { data: ticketsData, error: ticketsError } = await db
+      .from('tickets')
+      .select('id, event_id')
+      .in('id', ticket_ids);
+
+    if (ticketsError) return res.status(400).json({ success: false, error: ticketsError.message });
+    if (!ticketsData || ticketsData.length === 0) {
+      return res.status(404).json({ success: false, error: 'Aucun billet trouvé.' });
+    }
+
+    const eventIds = [...new Set(ticketsData.map((t) => t.event_id))];
+    for (const eventId of eventIds) {
+      const { data: eventData, error: eventError } = await db
+        .from('events')
+        .select('organization_id')
+        .eq('id', eventId)
+        .single();
+      if (eventError || !eventData) {
+        return res.status(404).json({ success: false, error: 'Événement lié aux billets introuvable.' });
+      }
+
+      const { data: memberRows } = await db
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', eventData.organization_id)
+        .eq('profile_id', authData.user.id)
+        .limit(1);
+
+      if (!memberRows || memberRows.length === 0 || memberRows[0].role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Accès refusé: administrateur requis pour supprimer des billets.' });
+      }
+    }
+
+    const idsToDelete = ticketsData.map((t) => t.id);
+    const { error: deleteError } = await db.from('tickets').delete().in('id', idsToDelete);
+
+    if (deleteError) return res.status(400).json({ success: false, error: deleteError.message });
+
+    return res.json({
+      success: true,
+      message: `${idsToDelete.length} billet(s) supprimé(s) avec succès.`,
+      deleted_count: idsToDelete.length,
+    });
+  } catch (error) {
+    console.error('Erreur POST tickets/bulk-delete:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors de la suppression des billets.' });
+  }
+});
+
+/**
+ * POST /api/auth/tickets/bulk-update-status
+ * Body: { ticket_ids: string[], status: 'vendu' | 'valide' }
+ */
+router.post('/tickets/bulk-update-status', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { ticket_ids, status } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!Array.isArray(ticket_ids) || ticket_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'ticket_ids requis (tableau non vide)' });
+    }
+    if (!['vendu', 'valide'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'status doit être vendu ou valide' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) return res.status(401).json({ success: false, error: 'Authentification invalide' });
+
+    const db = supabase.createClientWithAuth(access_token);
+    const admin = supabase.admin || supabase;
+
+    const { data: ticketsData, error: ticketsError } = await db
+      .from('tickets')
+      .select('id, event_id, status')
+      .in('id', ticket_ids);
+
+    if (ticketsError) return res.status(400).json({ success: false, error: ticketsError.message });
+    if (!ticketsData?.length) return res.status(404).json({ success: false, error: 'Aucun billet trouvé.' });
+
+    const eventIds = [...new Set(ticketsData.map((t) => t.event_id))];
+    for (const eventId of eventIds) {
+      const { data: eventData, error: eventError } = await db
+        .from('events')
+        .select('organization_id')
+        .eq('id', eventId)
+        .single();
+      if (eventError || !eventData) {
+        return res.status(404).json({ success: false, error: 'Événement lié aux billets introuvable.' });
+      }
+
+      const { data: memberRows } = await db
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', eventData.organization_id)
+        .eq('profile_id', authData.user.id)
+        .limit(1);
+
+      if (!memberRows?.length || memberRows[0].role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Accès refusé: administrateur requis.' });
+      }
+    }
+
+    const blockedStatuses = ['utilisé', 'utilise', 'used'];
+    const eligibleTickets = ticketsData.filter(
+      (ticket) => !blockedStatuses.includes(String(ticket.status || '').toLowerCase())
+    );
+    const skippedCount = ticketsData.length - eligibleTickets.length;
+
+    if (eligibleTickets.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Aucun billet éligible (les billets déjà scannés ne peuvent pas être modifiés).',
+      });
+    }
+
+    const now = new Date().toISOString();
+    const updatePayload =
+      status === 'vendu'
+        ? { status: 'vendu', sold_by: authData.user.id, updated_at: now }
+        : { status: 'valide', sold_by: null, updated_at: now };
+
+    const eligibleIds = eligibleTickets.map((t) => t.id);
+    const { error: updateError } = await admin.from('tickets').update(updatePayload).in('id', eligibleIds);
+
+    if (updateError) return res.status(400).json({ success: false, error: updateError.message });
+
+    const actionLabel = status === 'vendu' ? 'marqué(s) comme vendu' : 'marqué(s) comme valide';
+    return res.json({
+      success: true,
+      updated_count: eligibleIds.length,
+      skipped_count: skippedCount,
+      message: `${eligibleIds.length} billet(s) ${actionLabel}${skippedCount > 0 ? ` (${skippedCount} ignoré(s), déjà scanné(s))` : ''}.`,
+    });
+  } catch (error) {
+    console.error('Erreur POST tickets/bulk-update-status:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors de la mise à jour des billets.' });
   }
 });
 
@@ -3714,6 +4192,289 @@ router.get('/events/:eventId/orders', async (req, res) => {
   }
 });
 
+async function assertOrderAdminAccess(db, admin, authUserId, orderId) {
+  const { data: orderItems, error: itemsError } = await admin
+    .from('order_items')
+    .select('ticket_id, tickets(id, event_id)')
+    .eq('order_id', orderId);
+
+  if (itemsError) throw new Error(itemsError.message);
+  if (!orderItems?.length) throw new Error('Aucun billet associé à cette commande');
+
+  const eventIds = [...new Set(orderItems.map((item) => item.tickets?.event_id).filter(Boolean))];
+  if (eventIds.length !== 1) throw new Error('Commande invalide: billets multi-événements');
+
+  const { data: eventData, error: eventError } = await db
+    .from('events')
+    .select('organization_id')
+    .eq('id', eventIds[0])
+    .single();
+
+  if (eventError || !eventData) throw new Error('Événement introuvable');
+
+  const { data: memberRows } = await db
+    .from('organization_members')
+    .select('role')
+    .eq('organization_id', eventData.organization_id)
+    .eq('profile_id', authUserId)
+    .limit(1);
+
+  if (!memberRows?.length || memberRows[0].role !== 'admin') {
+    throw new Error('Accès refusé: administrateur requis');
+  }
+
+  return { ticketIds: orderItems.map((item) => item.ticket_id) };
+}
+
+async function devalidateSingleOrder(db, admin, authUserId, orderId) {
+  const { data: order, error: orderError } = await admin
+    .from('orders')
+    .select('id, payment_status')
+    .eq('id', orderId)
+    .single();
+
+  if (orderError || !order) throw new Error('Commande introuvable');
+  if (order.payment_status !== 'validated') {
+    throw new Error('Seules les commandes validées peuvent être dévalidées');
+  }
+
+  const { ticketIds } = await assertOrderAdminAccess(db, admin, authUserId, orderId);
+
+  const { data: tickets, error: ticketsError } = await admin
+    .from('tickets')
+    .select('id, status')
+    .in('id', ticketIds);
+
+  if (ticketsError) throw new Error(ticketsError.message);
+
+  const blocked = (tickets || []).filter((ticket) =>
+    ['utilisé', 'utilise', 'used'].includes(String(ticket.status || '').toLowerCase())
+  );
+  if (blocked.length > 0) {
+    throw new Error('Impossible de dévalider: des billets ont déjà été scannés');
+  }
+
+  const now = new Date().toISOString();
+
+  const { error: orderUpdateError } = await admin
+    .from('orders')
+    .update({ payment_status: 'pending' })
+    .eq('id', orderId);
+
+  if (orderUpdateError) throw new Error(orderUpdateError.message);
+
+  const { error: ticketsUpdateError } = await admin
+    .from('tickets')
+    .update({ status: 'valide', sold_by: null, updated_at: now })
+    .in('id', ticketIds);
+
+  if (ticketsUpdateError) {
+    await admin.from('orders').update({ payment_status: 'validated' }).eq('id', orderId);
+    throw new Error(ticketsUpdateError.message);
+  }
+
+  return { orderId, ticketIds };
+}
+
+/**
+ * POST /api/auth/orders/bulk-devalidate
+ * Body: { order_ids: string[] }
+ */
+router.post('/orders/bulk-devalidate', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { order_ids } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!Array.isArray(order_ids) || order_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'order_ids requis (tableau non vide)' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) {
+      return res.status(401).json({ success: false, error: 'Authentification invalide' });
+    }
+
+    const db = supabase.createClientWithAuth(access_token);
+    const admin = supabase.admin || supabase;
+    let devalidatedCount = 0;
+    const errors = [];
+
+    for (const orderId of order_ids) {
+      try {
+        await devalidateSingleOrder(db, admin, authData.user.id, orderId);
+        devalidatedCount += 1;
+      } catch (err) {
+        errors.push({ order_id: orderId, error: err.message || 'Erreur de dévalidation' });
+      }
+    }
+
+    return res.json({
+      success: devalidatedCount > 0,
+      devalidated_count: devalidatedCount,
+      errors,
+      message: `${devalidatedCount} commande(s) dévalidée(s) avec succès.`,
+    });
+  } catch (error) {
+    console.error('Erreur POST orders/bulk-devalidate:', error);
+    return res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
+/**
+ * POST /api/auth/orders/bulk-validate
+ * Body: { order_ids: string[] }
+ */
+router.post('/orders/bulk-validate', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { order_ids } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!Array.isArray(order_ids) || order_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'order_ids requis (tableau non vide)' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) {
+      return res.status(401).json({ success: false, error: 'Authentification invalide' });
+    }
+
+    const db = supabase.createClientWithAuth(access_token);
+    const admin = supabase.admin || supabase;
+    const now = new Date().toISOString();
+    let validatedCount = 0;
+    const errors = [];
+
+    for (const orderId of order_ids) {
+      try {
+        const { data: order, error: orderError } = await admin
+          .from('orders')
+          .select('id, payment_status')
+          .eq('id', orderId)
+          .single();
+
+        if (orderError || !order) {
+          errors.push({ order_id: orderId, error: 'Commande introuvable' });
+          continue;
+        }
+        if (order.payment_status !== 'pending') {
+          errors.push({ order_id: orderId, error: 'Commande déjà traitée' });
+          continue;
+        }
+
+        const { ticketIds } = await assertOrderAdminAccess(db, admin, authData.user.id, orderId);
+
+        const { error: orderUpdateError } = await admin
+          .from('orders')
+          .update({ payment_status: 'validated' })
+          .eq('id', orderId);
+
+        if (orderUpdateError) {
+          errors.push({ order_id: orderId, error: orderUpdateError.message });
+          continue;
+        }
+
+        const { error: ticketsUpdateError } = await admin
+          .from('tickets')
+          .update({ status: 'vendu', sold_by: authData.user.id, updated_at: now })
+          .in('id', ticketIds);
+
+        if (ticketsUpdateError) {
+          await admin.from('orders').update({ payment_status: 'pending' }).eq('id', orderId);
+          errors.push({ order_id: orderId, error: ticketsUpdateError.message });
+          continue;
+        }
+
+        validatedCount += 1;
+      } catch (err) {
+        errors.push({ order_id: orderId, error: err.message || 'Erreur de validation' });
+      }
+    }
+
+    return res.json({
+      success: validatedCount > 0,
+      validated_count: validatedCount,
+      errors,
+      message: `${validatedCount} commande(s) validée(s) avec succès.`,
+    });
+  } catch (error) {
+    console.error('Erreur POST orders/bulk-validate:', error);
+    return res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
+/**
+ * POST /api/auth/orders/bulk-delete
+ * Body: { order_ids: string[] }
+ */
+router.post('/orders/bulk-delete', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { order_ids } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!Array.isArray(order_ids) || order_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'order_ids requis (tableau non vide)' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) {
+      return res.status(401).json({ success: false, error: 'Authentification invalide' });
+    }
+
+    const db = supabase.createClientWithAuth(access_token);
+    const admin = supabase.admin || supabase;
+    let deletedCount = 0;
+    const errors = [];
+
+    for (const orderId of order_ids) {
+      try {
+        const { data: order, error: orderError } = await admin
+          .from('orders')
+          .select('id')
+          .eq('id', orderId)
+          .single();
+
+        if (orderError || !order) {
+          errors.push({ order_id: orderId, error: 'Commande introuvable' });
+          continue;
+        }
+
+        const { ticketIds } = await assertOrderAdminAccess(db, admin, authData.user.id, orderId);
+
+        const { error: deleteOrderError } = await admin.from('orders').delete().eq('id', orderId);
+        if (deleteOrderError) {
+          errors.push({ order_id: orderId, error: deleteOrderError.message });
+          continue;
+        }
+
+        if (ticketIds.length > 0) {
+          const { error: deleteTicketsError } = await admin.from('tickets').delete().in('id', ticketIds);
+          if (deleteTicketsError) {
+            errors.push({ order_id: orderId, error: deleteTicketsError.message });
+            continue;
+          }
+        }
+
+        deletedCount += 1;
+      } catch (err) {
+        errors.push({ order_id: orderId, error: err.message || 'Erreur de suppression' });
+      }
+    }
+
+    return res.json({
+      success: deletedCount > 0,
+      deleted_count: deletedCount,
+      errors,
+      message: `${deletedCount} commande(s) supprimée(s) avec succès.`,
+    });
+  } catch (error) {
+    console.error('Erreur POST orders/bulk-delete:', error);
+    return res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
 /**
  * POST /api/auth/orders/:id/validate
  * Valide une commande en ligne : payment_status → validated, billets → vendu + sold_by admin.
@@ -3832,6 +4593,40 @@ router.post('/orders/:id/validate', async (req, res) => {
   } catch (error) {
     console.error('Erreur POST validate order:', error);
     return res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
+/**
+ * POST /api/auth/orders/:id/devalidate
+ * Annule la validation d'une commande : payment_status → pending, billets → valide.
+ */
+router.post('/orders/:id/devalidate', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { id: orderId } = req.params;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!orderId) return res.status(400).json({ success: false, error: 'order_id requis' });
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) {
+      return res.status(401).json({ success: false, error: 'Authentification invalide' });
+    }
+
+    const db = supabase.createClientWithAuth(access_token);
+    const admin = supabase.admin || supabase;
+
+    const result = await devalidateSingleOrder(db, admin, authData.user.id, orderId);
+
+    return res.json({
+      success: true,
+      order_id: result.orderId,
+      ticket_ids: result.ticketIds,
+      message: 'Commande dévalidée et billets remis en statut valide',
+    });
+  } catch (error) {
+    console.error('Erreur POST devalidate order:', error);
+    return res.status(400).json({ success: false, error: error.message || 'Erreur serveur' });
   }
 });
 

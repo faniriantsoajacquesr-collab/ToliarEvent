@@ -88,9 +88,12 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
   const [orders, setOrders] = useState<OnlineOrder[]>([]);
   const [kpis, setKpis] = useState<OrderKpis>(EMPTY_KPIS);
   const [filter, setFilter] = useState<'all' | PaymentStatus>('pending');
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
+  const [devalidatingId, setDevalidatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const loadOrders = useCallback(async () => {
     if (!selectedEventId || !session?.access_token) return;
@@ -110,6 +113,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
 
       setOrders(response.orders || []);
       setKpis(response.kpis || EMPTY_KPIS);
+      setSelectedOrderIds(new Set());
     } catch (error) {
       console.error('OrderManagement loadOrders', error);
       showToast('Impossible de contacter le serveur', 'error');
@@ -121,6 +125,34 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
+
+  const allSelected = orders.length > 0 && orders.every((order) => selectedOrderIds.has(order.id));
+  const someSelected = orders.some((order) => selectedOrderIds.has(order.id));
+  const selectedPendingCount = Array.from(selectedOrderIds).filter((id) => {
+    const order = orders.find((o) => o.id === id);
+    return order?.payment_status === 'pending';
+  }).length;
+  const selectedValidatedCount = Array.from(selectedOrderIds).filter((id) => {
+    const order = orders.find((o) => o.id === id);
+    return order?.payment_status === 'validated';
+  }).length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(orders.map((order) => order.id)));
+    }
+  };
+
+  const toggleSelectOne = (orderId: string) => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
 
   const handleValidate = async (orderId: string) => {
     if (!session?.access_token) return;
@@ -167,6 +199,113 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
       showToast('Erreur lors de la suppression', 'error');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleBulkValidate = async () => {
+    if (!session?.access_token) return;
+    const pendingIds = Array.from(selectedOrderIds).filter((id) => {
+      const order = orders.find((o) => o.id === id);
+      return order?.payment_status === 'pending';
+    });
+
+    if (pendingIds.length === 0) {
+      showToast('Sélectionnez au moins une commande en attente à valider.', 'error');
+      return;
+    }
+
+    if (!confirm(`Valider ${pendingIds.length} commande${pendingIds.length > 1 ? 's' : ''} en attente ?`)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      const response = await authAPI.bulkValidateOrders(pendingIds, session.access_token);
+      if (!response.success && !response.validated_count) {
+        showToast(response.error || 'Validation groupée impossible', 'error');
+        return;
+      }
+      showToast(response.message || 'Commandes validées avec succès', 'success');
+      await loadOrders();
+    } catch (error) {
+      console.error('OrderManagement bulk validate', error);
+      showToast('Erreur lors de la validation groupée', 'error');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleDevalidate = async (orderId: string) => {
+    if (!session?.access_token) return;
+    if (!confirm('Dévalider cette commande et remettre les billets en statut valide ?')) return;
+
+    setDevalidatingId(orderId);
+    try {
+      const response = await authAPI.devalidateOrder(orderId, session.access_token);
+      if (!response.success) {
+        showToast(response.error || 'Dévalidation impossible', 'error');
+        return;
+      }
+      showToast(response.message || 'Commande dévalidée avec succès', 'success');
+      await loadOrders();
+    } catch (error) {
+      console.error('OrderManagement devalidate', error);
+      showToast('Erreur lors de la dévalidation', 'error');
+    } finally {
+      setDevalidatingId(null);
+    }
+  };
+
+  const handleBulkDevalidate = async () => {
+    if (!session?.access_token) return;
+    const validatedIds = Array.from(selectedOrderIds).filter((id) => {
+      const order = orders.find((o) => o.id === id);
+      return order?.payment_status === 'validated';
+    });
+
+    if (validatedIds.length === 0) {
+      showToast('Sélectionnez au moins une commande validée à dévalider.', 'error');
+      return;
+    }
+
+    if (!confirm(`Dévalider ${validatedIds.length} commande${validatedIds.length > 1 ? 's' : ''} validée${validatedIds.length > 1 ? 's' : ''} ?`)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      const response = await authAPI.bulkDevalidateOrders(validatedIds, session.access_token);
+      if (!response.success && !response.devalidated_count) {
+        showToast(response.error || 'Dévalidation groupée impossible', 'error');
+        return;
+      }
+      showToast(response.message || 'Commandes dévalidées avec succès', 'success');
+      await loadOrders();
+    } catch (error) {
+      console.error('OrderManagement bulk devalidate', error);
+      showToast('Erreur lors de la dévalidation groupée', 'error');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!session?.access_token) return;
+    const ids = Array.from(selectedOrderIds);
+    if (ids.length === 0) return;
+
+    if (!confirm(`Supprimer ${ids.length} commande${ids.length > 1 ? 's' : ''} sélectionnée${ids.length > 1 ? 's' : ''} ?`)) return;
+
+    setIsBulkProcessing(true);
+    try {
+      const response = await authAPI.bulkDeleteOrders(ids, session.access_token);
+      if (!response.success && !response.deleted_count) {
+        showToast(response.error || 'Suppression groupée impossible', 'error');
+        return;
+      }
+      showToast(response.message || 'Commandes supprimées avec succès', 'success');
+      await loadOrders();
+    } catch (error) {
+      console.error('OrderManagement bulk delete', error);
+      showToast('Erreur lors de la suppression groupée', 'error');
+    } finally {
+      setIsBulkProcessing(false);
     }
   };
 
@@ -257,37 +396,94 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
 
         <section className="space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant/20 pb-4">
-            <h3 className="text-lg font-bold text-on-surface">Liste des commandes</h3>
-            <div className="flex items-center gap-2 rounded-full border border-outline-variant/40 bg-background p-1">
-              {([
-                ['pending', 'En attente'],
-                ['validated', 'Validées'],
-                ['all', 'Toutes'],
-              ] as const).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFilter(value)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    filter === value
-                      ? 'bg-primary text-white'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  {label}
-                  {value === 'pending' && pendingHighlight && filter !== 'pending' && (
-                    <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-amber-500" />
-                  )}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold text-on-surface">Liste des commandes</h3>
+              {pendingHighlight && filter !== 'pending' && (
+                <span className="inline-flex h-2 w-2 rounded-full bg-amber-500" title="Commandes en attente" />
+              )}
+            </div>
+            <div className="relative w-full sm:w-56">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
+                filter_list
+              </span>
+              <select
+                className="w-full pl-9 pr-8 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs font-semibold appearance-none focus:border-primary focus:outline-none transition-all text-on-surface"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as typeof filter)}
+              >
+                <option value="pending">En attente</option>
+                <option value="validated">Validées</option>
+                <option value="rejected">Refusées</option>
+                <option value="all">Toutes</option>
+              </select>
             </div>
           </div>
+
+          {selectedOrderIds.size > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+              <span className="text-sm font-medium text-primary">
+                {selectedOrderIds.size} commande{selectedOrderIds.size > 1 ? 's' : ''} sélectionnée{selectedOrderIds.size > 1 ? 's' : ''}
+                {selectedPendingCount > 0 && ` · ${selectedPendingCount} en attente`}
+                {selectedValidatedCount > 0 && ` · ${selectedValidatedCount} validée${selectedValidatedCount > 1 ? 's' : ''}`}
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderIds(new Set())}
+                  disabled={isBulkProcessing}
+                  className="rounded-lg border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition disabled:opacity-50"
+                >
+                  Désélectionner
+                </button>
+                {selectedPendingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBulkValidate}
+                    disabled={isBulkProcessing}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 transition disabled:opacity-50"
+                  >
+                    {isBulkProcessing ? 'Traitement...' : 'Valider la sélection'}
+                  </button>
+                )}
+                {selectedValidatedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBulkDevalidate}
+                    disabled={isBulkProcessing}
+                    className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition disabled:opacity-50"
+                  >
+                    {isBulkProcessing ? 'Traitement...' : 'Dévalider la sélection'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={isBulkProcessing}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition disabled:opacity-50"
+                >
+                  Supprimer la sélection
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-outline-variant/30 bg-surface overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-surface-container-low text-left text-on-surface-variant">
                   <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someSelected && !allSelected;
+                        }}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-outline-variant/50 text-primary focus:ring-primary/30 cursor-pointer"
+                        aria-label="Tout sélectionner"
+                      />
+                    </th>
                     <th className="px-4 py-3 font-semibold">Date</th>
                     <th className="px-4 py-3 font-semibold">Acheteur</th>
                     <th className="px-4 py-3 font-semibold">Réf. transaction</th>
@@ -300,13 +496,27 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                 <tbody>
                   {orders.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-on-surface-variant">
+                      <td colSpan={8} className="px-4 py-10 text-center text-on-surface-variant">
                         Aucune commande pour ce filtre.
                       </td>
                     </tr>
                   ) : (
                     orders.map((order) => (
-                      <tr key={order.id} className="border-t border-outline-variant/20">
+                      <tr
+                        key={order.id}
+                        className={`border-t border-outline-variant/20 ${
+                          selectedOrderIds.has(order.id) ? 'bg-primary/5' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedOrderIds.has(order.id)}
+                            onChange={() => toggleSelectOne(order.id)}
+                            className="h-4 w-4 rounded border-outline-variant/50 text-primary focus:ring-primary/30 cursor-pointer"
+                            aria-label={`Sélectionner commande ${order.transaction_id}`}
+                          />
+                        </td>
                         <td className="px-4 py-4 whitespace-nowrap">{formatDate(order.created_at)}</td>
                         <td className="px-4 py-4">
                           <div className="font-semibold text-on-surface">{order.buyer_name}</div>
@@ -352,7 +562,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                               <button
                                 type="button"
                                 onClick={() => handleValidate(order.id)}
-                                disabled={validatingId === order.id || deletingId === order.id}
+                                disabled={validatingId === order.id || deletingId === order.id || isBulkProcessing}
                                 className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-60"
                               >
                                 {validatingId === order.id ? (
@@ -370,10 +580,32 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                                 )}
                               </button>
                             )}
+                            {order.payment_status === 'validated' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDevalidate(order.id)}
+                                disabled={devalidatingId === order.id || deletingId === order.id || validatingId === order.id || isBulkProcessing}
+                                className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                              >
+                                {devalidatingId === order.id ? (
+                                  <>
+                                    <span className="material-symbols-outlined text-sm animate-spin">
+                                      progress_activity
+                                    </span>
+                                    Dévalidation...
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="material-symbols-outlined text-sm">undo</span>
+                                    Dévalider
+                                  </>
+                                )}
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleDelete(order)}
-                              disabled={deletingId === order.id || validatingId === order.id}
+                              disabled={deletingId === order.id || validatingId === order.id || devalidatingId === order.id || isBulkProcessing}
                               className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-60"
                             >
                               {deletingId === order.id ? (
@@ -397,6 +629,12 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="px-4 py-3 bg-surface-container-low border-t border-outline-variant/30 text-xs text-on-surface-variant">
+              {orders.length === 0
+                ? 'Aucune commande affichée'
+                : `${orders.length} commande${orders.length > 1 ? 's' : ''} affichée${orders.length > 1 ? 's' : ''}`}
+              {selectedOrderIds.size > 0 && ` · ${selectedOrderIds.size} sélectionnée${selectedOrderIds.size > 1 ? 's' : ''}`}
             </div>
           </div>
         </section>

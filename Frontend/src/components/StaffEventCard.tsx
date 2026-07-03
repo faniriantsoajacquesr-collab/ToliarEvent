@@ -10,6 +10,8 @@ interface Props {
   status: 'En attente' | 'Approuvé' | 'Refusé';
   onSelect?: (id: string) => void;
   onQuit?: (appId: number) => void;
+  onRetry?: (appId: number) => void;
+  isRetrying?: boolean;
 }
 
 export default function StaffEventCard({
@@ -23,6 +25,8 @@ export default function StaffEventCard({
   status,
   onSelect,
   onQuit,
+  onRetry,
+  isRetrying = false,
 }: Props) {
   return (
     <div
@@ -60,6 +64,16 @@ export default function StaffEventCard({
           </div>
 
           <div className="flex items-center gap-sm">
+            {status === 'Refusé' && onRetry && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRetry(appId); }}
+                disabled={isRetrying}
+                className="text-primary font-bold text-label-md flex items-center gap-xs hover:underline disabled:opacity-60"
+              >
+                <span className="material-symbols-outlined text-[18px]">refresh</span>
+                {isRetrying ? 'Envoi...' : 'Réessayer'}
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); onQuit?.(appId); }}
               className="text-error font-bold text-label-md flex items-center gap-xs hover:underline"

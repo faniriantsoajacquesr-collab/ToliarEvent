@@ -190,6 +190,14 @@ export const authAPI = {
     return response.json();
   },
 
+  async retryEventApplication(applicationId: number, accessToken: string) {
+    const response = await fetch(`${API_URL}/event-staff/my/${applicationId}/retry`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return response.json();
+  },
+
   // Get event staff applications (admin)
   async getEventApplications(eventId: string, accessToken: string, status: string = 'en_attente') {
     const response = await fetch(`${API_URL}/event-staff?event_id=${encodeURIComponent(eventId)}&status=${encodeURIComponent(status)}`, {
@@ -533,6 +541,94 @@ export const authAPI = {
     const response = await fetch(`${API_URL}/orders/${encodeURIComponent(orderId)}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return response.json();
+  },
+
+  async bulkValidateOrders(orderIds: string[], accessToken: string) {
+    const response = await fetch(`${API_URL}/orders/bulk-validate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ order_ids: orderIds }),
+    });
+    return response.json();
+  },
+
+  async bulkDeleteOrders(orderIds: string[], accessToken: string) {
+    const response = await fetch(`${API_URL}/orders/bulk-delete`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ order_ids: orderIds }),
+    });
+    return response.json();
+  },
+
+  async devalidateOrder(orderId: string, accessToken: string) {
+    const response = await fetch(`${API_URL}/orders/${encodeURIComponent(orderId)}/devalidate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return response.json();
+  },
+
+  async bulkDevalidateOrders(orderIds: string[], accessToken: string) {
+    const response = await fetch(`${API_URL}/orders/bulk-devalidate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ order_ids: orderIds }),
+    });
+    return response.json();
+  },
+
+  async bulkUpdateTicketStatus(ticketIds: string[], status: 'vendu' | 'valide', accessToken: string) {
+    const response = await fetch(`${API_URL}/tickets/bulk-update-status`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ticket_ids: ticketIds, status }),
+    });
+    return response.json();
+  },
+
+  async bulkEventStaffAction(
+    applicationIds: number[],
+    action: 'accept' | 'reject' | 'delete',
+    accessToken: string
+  ) {
+    const response = await fetch(`${API_URL}/event-staff/bulk-action`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ application_ids: applicationIds, action }),
+    });
+    return response.json();
+  },
+
+  async bulkOrganizationMembersAction(
+    memberIds: number[],
+    action: 'validate' | 'reject' | 'delete',
+    accessToken: string
+  ) {
+    const response = await fetch(`${API_URL}/organization-members/bulk-action`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ member_ids: memberIds, action }),
     });
     return response.json();
   },

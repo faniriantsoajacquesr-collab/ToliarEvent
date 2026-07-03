@@ -24,7 +24,9 @@ interface StaffMember {
 
 export default function StaffManagement({ selectedEventId }: { selectedEventId?: string | null }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showOnlyToValidate, setShowOnlyToValidate] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'validated' | 'rejected'>('all');
+  const [selectedStaffIds, setSelectedStaffIds] = useState<Set<number>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -40,11 +42,19 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
     try {
       // If an event is selected, load event_staff rows (applications) and use profiles for user data
       if (selectedEventId) {
-        const statusFilter = showOnlyToValidate ? 'en_attente' : 'all';
-        const res = await authAPI.getEventApplications(selectedEventId, session.access_token, statusFilter);
+        const eventStatusMap = {
+          all: 'all',
+          pending: 'en_attente',
+          validated: 'valide',
+          rejected: 'refuse',
+        } as const;
+        const res = await authAPI.getEventApplications(
+          selectedEventId,
+          session.access_token,
+          eventStatusMap[statusFilter]
+        );
         console.debug('getEventApplications response:', res);
         if (res && res.success) {
-          // res.staff is already formatted server-side to include `profile` and `post`
           const normalized = (res.staff || []).map((s: any) => ({
             id: s.id,
             status: s.status,
@@ -53,6 +63,7 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
             profile: s.profile ?? s.profiles ?? null,
           }));
           setStaffMembers(normalized);
+          setSelectedStaffIds(new Set());
           // Also set organizationId based on myOrganization for actions that need it
           const orgRes = await authAPI.getMyOrganization(session.access_token);
           if (orgRes.success && orgRes.organization) setOrganizationId(orgRes.organization.id);
@@ -61,13 +72,21 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
           const orgRes = await authAPI.getMyOrganization(session.access_token);
           if (orgRes.success && orgRes.organization) {
             setOrganizationId(orgRes.organization.id);
-            const membersRes = await authAPI.getOrganizationMembers(orgRes.organization.id, searchQuery, showOnlyToValidate ? 'pending' : 'all', session.access_token);
+            const membersRes = await authAPI.getOrganizationMembers(
+              orgRes.organization.id,
+              searchQuery,
+              statusFilter === 'pending' ? 'pending' : statusFilter === 'validated' ? 'validated' : 'all',
+              session.access_token
+            );
             if (membersRes.success) {
               const normalized = (membersRes.members || []).map((m: any) => ({
                 ...m,
                 profile: m.profiles ?? m.profile ?? null,
+                status: m.is_validated ? 'valide' : 'en_attente',
+                post: m.role === 'admin' ? 'Administrateur' : 'Staff',
               }));
               setStaffMembers(normalized);
+              setSelectedStaffIds(new Set());
             } else {
               showToast(membersRes.error || 'Erreur lors du chargement des membres du staff.', 'error');
             }
@@ -88,14 +107,27 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
         }
         setOrganizationId(orgRes.organization.id);
 
-        const res = await authAPI.getOrganizationMembers(orgRes.organization.id, searchQuery, showOnlyToValidate ? 'pending' : 'all', session.access_token);
+        const orgFilter =
+          statusFilter === 'pending'
+            ? 'pending'
+            : statusFilter === 'validated'
+              ? 'validated'
+              : 'all';
+        const res = await authAPI.getOrganizationMembers(
+          orgRes.organization.id,
+          searchQuery,
+          orgFilter,
+          session.access_token
+        );
         if (res.success) {
-          // Normalize backend `profiles` key to `profile` expected by UI components
           const normalized = (res.members || []).map((m: any) => ({
             ...m,
             profile: m.profiles ?? m.profile ?? null,
+            status: m.is_validated ? 'valide' : 'en_attente',
+            post: m.role === 'admin' ? 'Administrateur' : 'Staff',
           }));
           setStaffMembers(normalized);
+          setSelectedStaffIds(new Set());
         } else {
           showToast(res.error || 'Erreur lors du chargement des membres du staff.', 'error');
         }
@@ -106,7 +138,7 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
     } finally {
       setIsLoading(false);
     }
-  }, [session, searchQuery, showOnlyToValidate, showToast, selectedEventId]);
+  }, [session, searchQuery, statusFilter, showToast, selectedEventId]);
 
   useEffect(() => {
     fetchStaffMembers();
@@ -233,6 +265,46 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
     }
   };
 
+  const handleBulkStaffAction = async (action: 'validate' | 'reject' | 'delete') => {
+    if (!session?.access_token) return;
+    const ids = Array.from(selectedStaffIds);
+    if (ids.length === 0) return;
+
+    const labels = {
+      validate: 'valider',
+      reject: 'refuser',
+      delete: 'supprimer',
+    };
+
+    if (!confirm(`${labels[action].charAt(0).toUpperCase()}${labels[action].slice(1)} ${ids.length} profil${ids.length > 1 ? 's' : ''} sélectionné${ids.length > 1 ? 's' : ''} ?`)) {
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      let response;
+      if (selectedEventId) {
+        const eventAction = action === 'validate' ? 'accept' : action === 'reject' ? 'reject' : 'delete';
+        response = await authAPI.bulkEventStaffAction(ids, eventAction, session.access_token);
+      } else {
+        response = await authAPI.bulkOrganizationMembersAction(ids, action, session.access_token);
+      }
+
+      if (response.success) {
+        showToast(response.message || 'Action groupée effectuée avec succès.', 'success');
+        setSelectedStaffIds(new Set());
+        fetchStaffMembers();
+      } else {
+        showToast(response.error || 'Erreur lors de l\'action groupée.', 'error');
+      }
+    } catch (err) {
+      console.error('Bulk staff action error:', err);
+      showToast('Impossible de contacter le serveur.', 'error');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   return (
     <>
       <main className="flex-1 pt-28 pb-xl px-gutter max-w-container-max mx-auto w-full overflow-y-auto overflow-x-hidden">
@@ -308,35 +380,78 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-md">
-                <label className="inline-flex items-center cursor-pointer group">
-                  <input
-                    className="form-checkbox h-5 w-5 text-primary rounded border-outline-variant focus:ring-primary transition-all group-hover:border-primary"
-                    type="checkbox"
-                    checked={showOnlyToValidate}
-                    onChange={(e) => setShowOnlyToValidate(e.target.checked)}
-                  />
-                  <span className="ml-sm text-on-surface-variant font-body-md text-body-md group-hover:text-primary transition-colors">
-                    Afficher uniquement les profils à valider
-                  </span>
-                </label>
-                <button className="flex items-center gap-xs px-md py-sm bg-surface-container-high rounded-lg text-on-surface font-label-md hover:bg-surface-variant transition-all hover:shadow-sm">
-                  <span className="material-symbols-outlined text-md">
-                    filter_list
-                  </span>
-                  Filtres
-                </button>
+              <div className="relative w-full sm:w-48">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
+                  filter_list
+                </span>
+                <select
+                  className="w-full pl-9 pr-8 py-2 bg-surface-bright border border-outline-variant rounded-lg text-xs font-semibold appearance-none focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                >
+                  <option value="all">Tous les statuts</option>
+                  <option value="pending">En attente</option>
+                  <option value="validated">Validés</option>
+                  {selectedEventId && <option value="rejected">Refusés</option>}
+                </select>
               </div>
             </div>
           </div>
 
+          {selectedStaffIds.size > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 mb-lg">
+              <span className="text-sm font-medium text-primary">
+                {selectedStaffIds.size} profil{selectedStaffIds.size > 1 ? 's' : ''} sélectionné{selectedStaffIds.size > 1 ? 's' : ''}
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedStaffIds(new Set())}
+                  disabled={isBulkProcessing}
+                  className="rounded-lg border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition disabled:opacity-50"
+                >
+                  Désélectionner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBulkStaffAction('validate')}
+                  disabled={isBulkProcessing}
+                  className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 transition disabled:opacity-50"
+                >
+                  Valider la sélection
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBulkStaffAction('reject')}
+                  disabled={isBulkProcessing}
+                  className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 transition disabled:opacity-50"
+                >
+                  Refuser la sélection
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBulkStaffAction('delete')}
+                  disabled={isBulkProcessing}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition disabled:opacity-50"
+                >
+                  Supprimer la sélection
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Staff Table */}
           {isLoading && <LoadingOverlay message="Chargement des membres du staff..." />}
           {!isLoading && (
-            <StaffTable staffData={filteredStaff} onRowClick={handleOpenModal}
+            <StaffTable
+              staffData={filteredStaff}
+              selectedIds={selectedStaffIds}
+              onSelectionChange={setSelectedStaffIds}
+              onRowClick={handleOpenModal}
               onDeleteStaff={handleDeleteStaff}
               onValidateStaff={handleValidateStaff}
-              onRejectStaff={handleRejectStaff} />
+              onRejectStaff={handleRejectStaff}
+            />
           )}
         {/* Footer */}
         <footer className="w-full bg-surface-container-low border-t border-outline-variant/30 mt-auto">

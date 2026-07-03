@@ -25,8 +25,10 @@ export default function EventDetailsModal({ isOpen, onClose, event }: EventDetai
   const { user, session } = useAuth();
 
   const [hasApplied, setHasApplied] = useState(false);
+  const [applicationId, setApplicationId] = useState<number | null>(null);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     if (isOpen && event && user?.role === 'staff' && session?.access_token) {
@@ -38,9 +40,11 @@ export default function EventDetailsModal({ isOpen, onClose, event }: EventDetai
           const data = await res.json();
           if (data.success && data.application) {
             setHasApplied(true);
+            setApplicationId(data.application.id);
             setApplicationStatus(data.application.status);
           } else {
             setHasApplied(false);
+            setApplicationId(null);
             setApplicationStatus(null);
           }
         } catch (err) {
@@ -51,6 +55,7 @@ export default function EventDetailsModal({ isOpen, onClose, event }: EventDetai
       fetchApplicationStatus();
     } else {
       setHasApplied(false);
+      setApplicationId(null);
       setApplicationStatus(null);
     }
   }, [isOpen, event, user?.role, session?.access_token, showToast]);
@@ -93,6 +98,29 @@ export default function EventDetailsModal({ isOpen, onClose, event }: EventDetai
       showToast('Impossible de contacter le serveur.', 'error');
     } finally {
       setIsApplying(false);
+    }
+  };
+
+  const isRejectedApplication = ['refuse', 'rejected'].includes(String(applicationStatus || '').toLowerCase())
+    || String(applicationStatus || '').toLowerCase().includes('refus');
+
+  const handleRetry = async () => {
+    if (!session?.access_token || !applicationId) return;
+
+    setIsRetrying(true);
+    try {
+      const data = await authAPI.retryEventApplication(applicationId, session.access_token);
+      if (data.success) {
+        showToast(data.message || 'Candidature renvoyée pour validation.', 'success');
+        setApplicationStatus('en_attente');
+      } else {
+        showToast(data.error || 'Impossible de relancer la candidature.', 'error');
+      }
+    } catch (err) {
+      console.error('Error retrying application:', err);
+      showToast('Impossible de contacter le serveur.', 'error');
+    } finally {
+      setIsRetrying(false);
     }
   };
 
@@ -147,9 +175,24 @@ export default function EventDetailsModal({ isOpen, onClose, event }: EventDetai
           <div className="mt-md pt-md border-t border-outline-variant space-y-sm">
             <h3 className="text-title-md font-semibold text-on-surface">Postuler à cet événement</h3>
             {hasApplied ? (
-              <p className="text-body-md text-on-surface-variant">
-                Vous avez déjà postulé à cet événement. Statut: <span className="font-semibold">{applicationStatus}</span>
-              </p>
+              isRejectedApplication ? (
+                <div className="space-y-3">
+                  <p className="text-body-md text-on-surface-variant">
+                    Votre candidature a été refusée. Vous pouvez la renvoyer pour une nouvelle validation.
+                  </p>
+                  <button
+                    onClick={handleRetry}
+                    disabled={isRetrying}
+                    className="w-full bg-primary text-on-primary px-lg py-md rounded-xl font-bold hover:bg-primary-container hover:text-on-primary-container transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isRetrying ? 'Envoi...' : 'Réessayer'}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-body-md text-on-surface-variant">
+                  Vous avez déjà postulé à cet événement. Statut: <span className="font-semibold">{applicationStatus}</span>
+                </p>
+              )
             ) : (
               <button
                 onClick={handleApply}

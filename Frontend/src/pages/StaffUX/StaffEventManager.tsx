@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { API_URL } from '../../config/api';
 import ApplyEventModal from '../../components/ApplyEventModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import { authAPI } from '../../services/authAPI';
 
 interface AppliedEvent {
   appId: number;
@@ -15,8 +17,10 @@ interface AppliedEvent {
 
 export default function StaffEventManager() {
   const { session } = useAuth();
+  const { showToast } = useToast();
   const [appliedEvents, setAppliedEvents] = useState<AppliedEvent[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [retryingAppId, setRetryingAppId] = useState<number | null>(null);
 
   // Fetch user's applications
   const fetchMyApplications = async () => {
@@ -74,12 +78,37 @@ export default function StaffEventManager() {
       const data = await res.json();
       if (data.success) {
         setAppliedEvents((prev) => prev.filter((p) => p.appId !== appId));
+        showToast('Candidature retirée.', 'success');
       } else {
-        alert(data.error || 'Impossible de quitter l\'événement');
+        showToast(data.error || 'Impossible de quitter l\'événement', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Erreur réseau');
+      showToast('Erreur réseau', 'error');
+    }
+  };
+
+  const handleRetryApplication = async (appId: number) => {
+    if (!session?.access_token) return;
+
+    setRetryingAppId(appId);
+    try {
+      const data = await authAPI.retryEventApplication(appId, session.access_token);
+      if (data.success) {
+        showToast(data.message || 'Candidature renvoyée pour validation.', 'success');
+        setAppliedEvents((prev) =>
+          prev.map((event) =>
+            event.appId === appId ? { ...event, status: 'En attente' } : event
+          )
+        );
+      } else {
+        showToast(data.error || 'Impossible de relancer la candidature.', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Erreur réseau', 'error');
+    } finally {
+      setRetryingAppId(null);
     }
   };
 
@@ -140,7 +169,18 @@ export default function StaffEventManager() {
                     </div>
                   </div>
                 </div>
-                <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end">
+                <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+                  {e.status === 'Refusé' && (
+                    <button
+                      type="button"
+                      onClick={() => handleRetryApplication(e.appId)}
+                      disabled={retryingAppId === e.appId}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90 transition-all disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-sm">refresh</span>
+                      {retryingAppId === e.appId ? 'Envoi...' : 'Réessayer'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleLeaveEvent(e.appId)}
