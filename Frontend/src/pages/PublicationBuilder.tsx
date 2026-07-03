@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { SocialIcon } from 'react-social-icons';
+import SocialPlatformIcon from '../components/SocialPlatformIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 import PublicationTemplate, { type TicketCard } from '../components/PublicationTemplate';
@@ -847,12 +847,11 @@ export default function PublicationBuilder({ eventId, eventName: initialEventNam
                   {landingData.socialLinks.map((link, idx) => (
                     <div key={idx} className="flex gap-2 items-center p-3 rounded-2xl border border-outline-variant bg-background shadow-sm">
                       <div className={`w-10 h-10 rounded-xl border border-outline-variant flex items-center justify-center ${THEME_ICON_BG[landingData.themePreset] ?? 'bg-slate-700'}`}>
-                        <SocialIcon
-                          url={link.url || `https://${link.platform}.com`}
-                          network={link.platform}
-                          style={{ width: 22, height: 22 }}
+                        <SocialPlatformIcon
+                          platform={link.platform}
+                          url={link.url}
+                          size={22}
                           fgColor="#ffffff"
-                          bgColor="transparent"
                         />
                       </div>
                       <select

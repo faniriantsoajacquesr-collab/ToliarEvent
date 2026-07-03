@@ -1,4 +1,4 @@
-import { SocialIcon } from 'react-social-icons';
+import SocialPlatformIcon from './SocialPlatformIcon';
 
 export interface TicketCard {
   id?: string | number;
@@ -267,12 +267,11 @@ export default function PublicationTemplate({
                             title={link.platform}
                             className={`w-10 h-10 rounded-full border ${accent.border} ${accent.iconBg} flex items-center justify-center ${accent.iconFg} hover:${accent.button} transition-all shadow-sm`}
                           >
-                            <SocialIcon
-                              url={link.url || `https://${link.platform}.com`}
-                              network={link.platform}
-                              style={{ width: 22, height: 22 }}
+                            <SocialPlatformIcon
+                              platform={link.platform}
+                              url={link.url}
+                              size={22}
                               fgColor="#ffffff"
-                              bgColor="transparent"
                             />
                           </a>
                         );

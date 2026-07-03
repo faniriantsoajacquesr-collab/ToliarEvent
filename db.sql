@@ -266,11 +266,19 @@ CREATE TABLE IF NOT EXISTS public.ticket_type (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   event_id uuid NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
   name text NOT NULL,
+  price numeric NOT NULL DEFAULT 0,
+  currency text NOT NULL DEFAULT 'Ar',
+  benefits jsonb NOT NULL DEFAULT '[]'::jsonb,
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT ticket_type_pkey PRIMARY KEY (id),
   CONSTRAINT ticket_type_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
+
+-- Migration pour bases existantes
+ALTER TABLE public.ticket_type ADD COLUMN IF NOT EXISTS price numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.ticket_type ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'Ar';
+ALTER TABLE public.ticket_type ADD COLUMN IF NOT EXISTS benefits jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 -- Index pour charger rapidement les types d'un événement
 CREATE INDEX IF NOT EXISTS idx_ticket_type_event ON public.ticket_type(event_id);
@@ -372,8 +380,11 @@ CREATE TABLE IF NOT EXISTS public.payment_method (
   "Operateur" character varying NULL,
   numero character varying NULL,
   is_active boolean NULL,
+  account_holder character varying NULL,
   CONSTRAINT payment_method_pkey PRIMARY KEY (id)
 );
+
+ALTER TABLE public.payment_method ADD COLUMN IF NOT EXISTS account_holder character varying NULL;
 
 -- Commandes d'achat en ligne (Mobile Money)
 CREATE TABLE IF NOT EXISTS public.orders (

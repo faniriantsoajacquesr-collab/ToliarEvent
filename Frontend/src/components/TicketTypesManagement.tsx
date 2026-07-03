@@ -21,6 +21,31 @@ type TicketTypeForm = {
 
 const CURRENCY_OPTIONS: CurrencyOption[] = ['Ar', '€', '$', 'FCFA'];
 
+function parseBenefits(benefits: unknown): string[] {
+  if (!benefits) return [];
+  if (Array.isArray(benefits)) return benefits.filter((item) => typeof item === 'string');
+  if (typeof benefits === 'string') {
+    try {
+      const parsed = JSON.parse(benefits);
+      if (Array.isArray(parsed)) return parsed.filter((item) => typeof item === 'string');
+      return [benefits];
+    } catch {
+      return [benefits];
+    }
+  }
+  return [];
+}
+
+function mapTicketTypeFromApi(raw: Record<string, unknown>): TicketType {
+  return {
+    id: String(raw.id),
+    name: String(raw.name || ''),
+    price: Number(raw.price ?? 0),
+    currency: (raw.currency || 'Ar') as CurrencyOption,
+    benefits: parseBenefits(raw.benefits),
+  };
+}
+
 function formatPrice(price: number, currency: CurrencyOption) {
   return `${price.toLocaleString('fr-FR')} ${currency}`;
 }
@@ -29,7 +54,9 @@ export default function TicketTypesManagement({ selectedEventId }: { selectedEve
   const { session } = useAuth();
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formState, setFormState] = useState<TicketTypeForm>({
@@ -58,7 +85,7 @@ export default function TicketTypesManagement({ selectedEventId }: { selectedEve
       try {
         const result = await authAPI.getTicketTypes(selectedEventId, session.access_token);
         if (result.success) {
-          setTicketTypes(result.ticket_types || []);
+          setTicketTypes((result.ticket_types || []).map(mapTicketTypeFromApi));
         } else {
           setTicketTypes([]);
           setFetchError(result.error || 'Impossible de charger les types de billets.');
@@ -93,12 +120,14 @@ export default function TicketTypesManagement({ selectedEventId }: { selectedEve
         benefits: [''],
       });
     }
+    setFormError(null);
     setIsPanelOpen(true);
   };
 
   const closeForm = () => {
     setIsPanelOpen(false);
     setEditingId(null);
+    setFormError(null);
   };
 
   const updateBenefit = (index: number, value: string) => {
@@ -120,38 +149,74 @@ export default function TicketTypesManagement({ selectedEventId }: { selectedEve
     }));
   };
 
-  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (!selectedEventId || !session?.access_token) {
+      setFormError('Événement ou session invalide.');
+      return;
+    }
 
     const name = formState.name.trim();
     const price = Number(formState.price);
     const benefits = formState.benefits.map((item) => item.trim()).filter(Boolean);
 
     if (!name || Number.isNaN(price) || price < 0) {
+      setFormError('Nom et prix valides requis.');
       return;
     }
 
-    const payload: TicketType = {
-      id: editingId ?? crypto.randomUUID(),
-      name,
-      price,
-      currency: formState.currency,
-      benefits,
-    };
+    setIsSaving(true);
+    setFormError(null);
 
-    setTicketTypes((prev) => {
-      if (editingId) {
-        return prev.map((item) => (item.id === editingId ? { ...item, ...payload } : item));
+    try {
+      const payload = {
+        name,
+        price,
+        currency: formState.currency,
+        benefits,
+      };
+
+      const result = editingId
+        ? await authAPI.updateTicketType(editingId, payload, session.access_token)
+        : await authAPI.createTicketType(selectedEventId, payload, session.access_token);
+
+      if (!result.success) {
+        setFormError(result.error || 'Enregistrement impossible.');
+        return;
       }
-      return [payload, ...prev];
-    });
 
-    closeForm();
+      const saved = mapTicketTypeFromApi(result.ticket_type || {});
+      setTicketTypes((prev) => {
+        if (editingId) {
+          return prev.map((item) => (item.id === editingId ? saved : item));
+        }
+        return [saved, ...prev];
+      });
+      closeForm();
+    } catch (error) {
+      console.error('Erreur save ticket type:', error);
+      setFormError('Impossible de contacter le serveur.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!window.confirm('Supprimer ce type de billet ?')) return;
-    setTicketTypes((prev) => prev.filter((ticket) => ticket.id !== id));
+    if (!session?.access_token) return;
+
+    try {
+      const result = await authAPI.deleteTicketType(id, session.access_token);
+      if (!result.success) {
+        setFetchError(result.error || 'Suppression impossible.');
+        return;
+      }
+      setTicketTypes((prev) => prev.filter((ticket) => ticket.id !== id));
+    } catch (error) {
+      console.error('Erreur delete ticket type:', error);
+      setFetchError('Impossible de contacter le serveur.');
+    }
   };
 
   const availableTypes = ticketTypes.length;
@@ -259,6 +324,11 @@ export default function TicketTypesManagement({ selectedEventId }: { selectedEve
               </button>
             </div>
             <form className="space-y-6 px-6 py-6" onSubmit={handleFormSubmit}>
+              {formError ? (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formError}
+                </div>
+              ) : null}
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2 text-sm text-on-surface-variant">
                   <span className="font-semibold text-on-surface">Nom du billet</span>
@@ -352,9 +422,10 @@ export default function TicketTypesManagement({ selectedEventId }: { selectedEve
                 </button>
                 <button
                   type="submit"
-                  className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-on-primary transition hover:bg-primary/95"
+                  disabled={isSaving}
+                  className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-on-primary transition hover:bg-primary/95 disabled:opacity-60"
                 >
-                  {editingTicket ? 'Enregistrer les modifications' : 'Créer le type'}
+                  {isSaving ? 'Enregistrement...' : editingTicket ? 'Enregistrer les modifications' : 'Créer le type'}
                 </button>
               </div>
             </form>

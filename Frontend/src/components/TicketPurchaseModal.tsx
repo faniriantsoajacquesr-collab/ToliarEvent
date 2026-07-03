@@ -26,13 +26,10 @@ export type SelectedTicketType = {
 
 
 type PaymentMethodOption = {
-
   id: number;
-
   operateur: string;
-
   numero: string;
-
+  accountHolder: string;
 };
 
 
@@ -108,17 +105,12 @@ function formatTransferNumber(numero: string): string {
 
 
 function normalizePaymentMethod(row: Record<string, unknown>): PaymentMethodOption {
-
   return {
-
     id: Number(row.id),
-
     operateur: String(row.Operateur ?? row.operateur ?? 'Mobile Money'),
-
     numero: String(row.numero ?? ''),
-
+    accountHolder: String(row.account_holder ?? row.accountHolder ?? '').trim(),
   };
-
 }
 
 
@@ -896,11 +888,11 @@ export default function TicketPurchaseModal({
                           />
 
                           <div className="flex-1">
-
                             <p className="text-sm font-bold text-slate-800">{method.operateur}</p>
-
                             <p className="text-xs text-slate-500">{formatTransferNumber(method.numero)}</p>
-
+                            {method.accountHolder ? (
+                              <p className="text-xs text-slate-600 mt-0.5">Au nom de {method.accountHolder}</p>
+                            ) : null}
                           </div>
 
                         </label>
@@ -926,13 +918,15 @@ export default function TicketPurchaseModal({
                   <p className="font-semibold">Instructions de transfert</p>
 
                   <p className="mt-2 leading-relaxed">
-
                     Veuillez transférer <span className="font-bold">{formatAmount(totalAmount)}</span> au numéro{' '}
-
                     <span className="font-bold">{formatTransferNumber(selectedPaymentMethod.numero)}</span> via{' '}
-
-                    <span className="font-bold">{selectedPaymentMethod.operateur}</span>, puis saisissez la référence de transaction ci-dessous.
-
+                    <span className="font-bold">{selectedPaymentMethod.operateur}</span>
+                    {selectedPaymentMethod.accountHolder ? (
+                      <>
+                        , au nom de <span className="font-bold">{selectedPaymentMethod.accountHolder}</span>
+                      </>
+                    ) : null}
+                    , puis saisissez la référence de transaction ci-dessous.
                   </p>
 
                 </div>

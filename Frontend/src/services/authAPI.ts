@@ -439,11 +439,39 @@ export const authAPI = {
   },
 
   // Ticket-type: create
-  async createTicketType(eventId: string, name: string, accessToken: string) {
+  async createTicketType(
+    eventId: string,
+    payload: string | { name: string; price?: number; currency?: string; benefits?: string[] },
+    accessToken: string
+  ) {
+    const body = typeof payload === 'string'
+      ? { event_id: eventId, name: payload }
+      : { event_id: eventId, ...payload };
     const response = await fetch(`${API_URL}/ticket-type`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-      body: JSON.stringify({ event_id: eventId, name }),
+      body: JSON.stringify(body),
+    });
+    return response.json();
+  },
+
+  async updateTicketType(
+    ticketTypeId: string,
+    payload: { name?: string; price?: number; currency?: string; benefits?: string[] },
+    accessToken: string
+  ) {
+    const response = await fetch(`${API_URL}/ticket-type/${encodeURIComponent(ticketTypeId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify(payload),
+    });
+    return response.json();
+  },
+
+  async deleteTicketType(ticketTypeId: string, accessToken: string) {
+    const response = await fetch(`${API_URL}/ticket-type/${encodeURIComponent(ticketTypeId)}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
     });
     return response.json();
   },
