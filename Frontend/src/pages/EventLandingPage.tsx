@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PublicationTemplate, { type TicketCard } from '../components/PublicationTemplate';
 import TicketPurchaseModal, { type SelectedTicketType } from '../components/TicketPurchaseModal';
 import { authAPI } from '../services/authAPI';
+import { setDocumentTitle } from '../utils/pageTitles';
 
 const defaultData = {
   title: 'Événement à Toliara',
@@ -136,6 +137,12 @@ export default function EventLandingPage() {
 
     loadLanding();
   }, [eventId]);
+
+  useEffect(() => {
+    if (!eventData) return;
+    const eventTitle = eventData.title || eventData.name || 'Événement';
+    setDocumentTitle(`${eventTitle} | ToliarEvent`);
+  }, [eventData]);
 
   if (loading) {
     return (

@@ -22,6 +22,7 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import PublicLayout from './components/PublicLayout';
 import LegalLayout from './components/LegalLayout';
+import PageTitle from './components/PageTitle';
 import { normalizeHash } from './hooks/usePublicNav';
 
 const LEGACY_DASHBOARD_PATHS: Record<string, string> = {
@@ -86,6 +87,7 @@ function App() {
     <AuthProvider>
       <ToastProvider>
       <Router>
+        <PageTitle />
         <HashRedirect />
         <Routes>
           <Route element={<PublicLayout />}>
