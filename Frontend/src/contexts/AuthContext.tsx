@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { API_URL } from '../config/api';
 import { resolveAppEntryPath, type OrganizationStatus } from '../utils/appRouting';
 
 export interface User {
@@ -77,7 +78,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Vérifier si le profil est complété localement
           // Toujours vérifier l'état complet depuis le serveur pour garantir la synchronisation (Profil + Organisation)
           try {
-            const res = await fetch('http://localhost:5000/api/auth/check-profile', {
+            const res = await fetch(`${API_URL}/check-profile`, {
               method: 'GET',
               headers: { 'Authorization': `Bearer ${storedAccessToken}` },
             });
@@ -138,7 +139,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -185,7 +186,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
+      const response = await fetch(`${API_URL}/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -210,7 +211,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
 
     try {
-      await fetch('http://localhost:5000/api/auth/logout', {
+      await fetch(`${API_URL}/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -245,7 +246,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/check-profile', {
+      const response = await fetch(`${API_URL}/check-profile`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,

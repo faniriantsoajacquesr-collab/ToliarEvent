@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config/api';
 
 export interface Skill {
   id: number;
@@ -31,7 +32,7 @@ export default function SkillSelector({
       setFetchLoading(true);
       const accessToken = localStorage.getItem('access_token');
       
-      const response = await fetch('http://localhost:5000/api/auth/skills', {
+      const response = await fetch(`${API_URL}/skills`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,

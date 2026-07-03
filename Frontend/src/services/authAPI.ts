@@ -3,7 +3,7 @@
  * Centralise tous les appels API d'authentification
  */
 
-const API_URL = 'http://localhost:5000/api/auth';
+import { API_URL } from '../config/api';
 
 export const authAPI = {
   // Login

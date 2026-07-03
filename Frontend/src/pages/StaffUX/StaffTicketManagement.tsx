@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { API_URL } from '../../config/api';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import { useToast } from '../../contexts/ToastContext';
 import TicketTable from '../../components/TicketTable'; // Vous pouvez réutiliser ou adapter ce tableau
@@ -51,7 +52,7 @@ export default function StaffTicketManagement({ selectedEventId }: { selectedEve
     setIsLoading(true);
     try {
       // Appel à l'API (on récupère les billets de l'événement)
-      const res = await fetch(`http://localhost:5000/api/auth/tickets?event_id=${selectedEventId}${debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : ''}`, {
+      const res = await fetch(`${API_URL}/tickets?event_id=${selectedEventId}${debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : ''}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const data = await res.json();
@@ -272,7 +273,7 @@ export default function StaffTicketManagement({ selectedEventId }: { selectedEve
           }
 
           try {
-            const res = await fetch('http://localhost:5000/api/auth/tickets/scan', {
+            const res = await fetch(`${API_URL}/tickets/scan`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

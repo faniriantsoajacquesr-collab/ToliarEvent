@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { API_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 import ProfileModal from './ProfileModal';
@@ -31,7 +32,7 @@ export default function DashboardTopBar({ selectedEvent, onSelectEvent, toggleMo
       // If user is staff, only show events where the user is already a member (validated)
       if (user?.role === 'staff') {
         try {
-          const res = await fetch('http://localhost:5000/api/auth/my-applications', {
+          const res = await fetch(`${API_URL}/my-applications`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
           });
           const data = await res.json();

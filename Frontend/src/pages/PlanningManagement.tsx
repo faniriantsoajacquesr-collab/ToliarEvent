@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { API_URL } from '../config/api';
 import GanttChart from '../components/GanttChart';
 import LoadingOverlay from '../components/LoadingOverlay';
 import type { GanttTask } from '../components/GanttChart';
@@ -140,7 +141,7 @@ export default function PlanningManagement({ selectedEventId }: { selectedEventI
       setIsLoading(true);
       try {
         // fetch event
-        const evRes = await fetch(`http://localhost:5000/api/auth/events/${encodeURIComponent(selectedEventId)}`, {
+        const evRes = await fetch(`${API_URL}/events/${encodeURIComponent(selectedEventId)}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         const evData = await evRes.json();
@@ -150,7 +151,7 @@ export default function PlanningManagement({ selectedEventId }: { selectedEventI
         }
 
         // fetch tasks
-        const res = await fetch(`http://localhost:5000/api/auth/tasks?event_id=${encodeURIComponent(selectedEventId)}`, {
+        const res = await fetch(`${API_URL}/tasks?event_id=${encodeURIComponent(selectedEventId)}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         const data = await res.json();
@@ -224,7 +225,7 @@ export default function PlanningManagement({ selectedEventId }: { selectedEventI
   const refreshTasks = async () => {
     if (!selectedEventId || !session?.access_token) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/tasks?event_id=${encodeURIComponent(selectedEventId)}`, {
+      const res = await fetch(`${API_URL}/tasks?event_id=${encodeURIComponent(selectedEventId)}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const data = await res.json();

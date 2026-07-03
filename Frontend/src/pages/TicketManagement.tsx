@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { API_URL } from '../config/api';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { useToast } from '../contexts/ToastContext';
 import TicketTable from '../components/TicketTable';
@@ -51,7 +52,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
 
     setIsLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/tickets?event_id=${selectedEventId}${debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : ''}`, {
+      const res = await fetch(`${API_URL}/tickets?event_id=${selectedEventId}${debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : ''}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const data = await res.json();

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { API_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 import { updateTaskStatus } from '../services/taskService';
@@ -411,7 +412,7 @@ export default function TaskDetailsModal({
         status,
         assigned_to: assignedTo,
       };
-      const resp = await fetch(`http://localhost:5000/api/auth/tasks/${encodeURIComponent(task.id)}`, {
+      const resp = await fetch(`${API_URL}/tasks/${encodeURIComponent(task.id)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

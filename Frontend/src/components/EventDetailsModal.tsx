@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config/api';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
@@ -31,7 +32,7 @@ export default function EventDetailsModal({ isOpen, onClose, event }: EventDetai
     if (isOpen && event && user?.role === 'staff' && session?.access_token) {
       const fetchApplicationStatus = async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/auth/my-event-application?event_id=${event.id}`, {
+          const res = await fetch(`${API_URL}/my-event-application?event_id=${event.id}`, {
             headers: { Authorization: `Bearer ${session.access_token}` },
           });
           const data = await res.json();

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API_URL } from '../config/api';
 import LoadingOverlay from '../components/LoadingOverlay';
 import EventCardDashboard from '../components/EventCardDashboard';
 import EventModal from '../components/EventModal';
@@ -98,7 +99,7 @@ export default function EventManager({ onSelectEvent }: EventManagerProps) {
     if (!confirm('Voulez-vous vraiment supprimer cet événement ?')) return;
     setDeleteLoadingId(id);
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/events/${id}`, { 
+      const res = await fetch(`${API_URL}/events/${id}`, { 
         method: 'DELETE', 
         headers: { Authorization: `Bearer ${session.access_token}` } 
       });

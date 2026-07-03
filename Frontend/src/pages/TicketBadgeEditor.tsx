@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { API_URL } from '../config/api';
 import { authAPI } from '../services/authAPI';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -388,7 +389,7 @@ export default function TicketBadgeEditor() {
         } 
       };
 
-      const res = await fetch('http://localhost:5000/api/auth/generate-tickets', {
+      const res = await fetch(`${API_URL}/generate-tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify(payload),

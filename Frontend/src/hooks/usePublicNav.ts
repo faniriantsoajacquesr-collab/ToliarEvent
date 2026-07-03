@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom';
+import { useLocation, type NavigateFunction } from 'react-router-dom';
 
 export type PublicNavSection = 'accueil' | 'a-propos' | 'contact' | 'evenements';
 

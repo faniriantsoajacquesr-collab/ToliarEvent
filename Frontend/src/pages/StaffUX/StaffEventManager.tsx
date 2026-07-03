@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../../config/api';
 import ApplyEventModal from '../../components/ApplyEventModal';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -21,7 +22,7 @@ export default function StaffEventManager() {
   const fetchMyApplications = async () => {
     if (!session?.access_token) return;
     try {
-      const res = await fetch('http://localhost:5000/api/auth/my-applications', {
+      const res = await fetch(`${API_URL}/my-applications`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const data = await res.json();
@@ -66,7 +67,7 @@ export default function StaffEventManager() {
     if (!session?.access_token) return;
     if (!confirm("Voulez-vous vraiment quitter cet événement ?")) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/event-staff/my/${appId}`, {
+      const res = await fetch(`${API_URL}/event-staff/my/${appId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session.access_token}` },
       });

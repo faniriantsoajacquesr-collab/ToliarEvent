@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 
@@ -75,7 +76,7 @@ export default function TaskFormModal({
         assigned_to: assignedTo || null,
       };
 
-      const resp = await fetch('http://localhost:5000/api/auth/tasks', {
+      const resp = await fetch(`${API_URL}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify(body),

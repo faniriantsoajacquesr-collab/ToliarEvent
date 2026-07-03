@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import EventModal from '../components/EventModal';
 import LoadingOverlay from '../components/LoadingOverlay';
@@ -28,7 +29,7 @@ export default function EventsPage() {
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/events', {
+      const res = await fetch(`${API_URL}/events`, {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
       const data = await res.json();

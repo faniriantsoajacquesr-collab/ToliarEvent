@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { API_URL } from '../config/api';
 import LegalAcceptanceCheckbox from '../components/LegalAcceptanceCheckbox';
 
 interface SignupFormData {
@@ -63,7 +64,7 @@ export default function SignupPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
+      const response = await fetch(`${API_URL}/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -83,7 +84,7 @@ export default function SignupPage() {
 
       // Essayer de connecter automatiquement l'utilisateur
       try {
-        const loginRes = await fetch('http://localhost:5000/api/auth/login', {
+        const loginRes = await fetch(`${API_URL}/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: formData.email, password: formData.password }),

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -31,7 +32,7 @@ export default function EditTicketModal({ isOpen, onClose, ticketId, eventId, on
         return;
       }
       setIsLoading(true);
-      fetch(`http://localhost:5000/api/auth/tickets?event_id=${encodeURIComponent(String(eventId))}&search=${ticketId.replace('#', '')}`, {
+      fetch(`${API_URL}/tickets?event_id=${encodeURIComponent(String(eventId))}&search=${ticketId.replace('#', '')}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
         .then(res => res.json())
@@ -69,7 +70,7 @@ export default function EditTicketModal({ isOpen, onClose, ticketId, eventId, on
 
     setIsLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/tickets/${ticketId}`, { // Use the specific ticket endpoint
+      const res = await fetch(`${API_URL}/tickets/${ticketId}`, { // Use the specific ticket endpoint
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

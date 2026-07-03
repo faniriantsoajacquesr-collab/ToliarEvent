@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 import MultiSelectPosts, { defaultPosts } from './MultiSelectPosts';
@@ -126,7 +127,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, event }: EventM
       // step === 2: final save (create with posts or update existing event with posts)
       const targetId = createdEventId || (editingEvent && editingEvent.id);
       if (targetId) {
-        const res = await fetch(`http://localhost:5000/api/auth/events/${targetId}`, {
+        const res = await fetch(`${API_URL}/events/${targetId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
@@ -167,7 +168,7 @@ export default function EventModal({ isOpen, onClose, onSuccess, event }: EventM
     if (!confirm('Voulez-vous vraiment supprimer cet événement ?')) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/events/${editingEvent.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${session?.access_token}` } });
+      const res = await fetch(`${API_URL}/events/${editingEvent.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${session?.access_token}` } });
       const data = await res.json();
       if (data.success) { onSuccess(); onClose(); }
     } catch (err) { console.error(err); } finally { setLoading(false); }
