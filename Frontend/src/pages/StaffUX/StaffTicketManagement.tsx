@@ -1,0 +1,320 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import LoadingOverlay from '../../components/LoadingOverlay';
+import { useToast } from '../../contexts/ToastContext';
+import TicketTable from '../../components/TicketTable'; // Vous pouvez réutiliser ou adapter ce tableau
+import { useAuth } from '../../contexts/AuthContext';
+import {  QrCodeModalScan } from '../../components/QrCodeModalScan';
+
+interface Ticket {
+  id: string;
+  displayId: string;
+  type: 'Standard' | 'VIP';
+  holder: {
+    initials: string;
+    name: string;
+  };
+  status: 'Utilisé' | 'Payé' | 'Valide';
+  sellerName?: string;
+  scannerName?: string;
+  price: number; // Ajouté pour le calcul du montant total
+}
+
+export default function StaffTicketManagement({ selectedEventId }: { selectedEventId: string | null }) {
+  const { session, user } = useAuth();
+  const { showToast } = useToast();
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrTicketId, setQrTicketId] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Configuration des prix selon le type de billet (à adapter selon votre logique)
+  const TICKET_PRICES = {
+    Standard: 10000, // Exemple: 10,000 MGA ou votre devise
+    VIP: 25000
+  };
+
+  useEffect(() => {
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+    debounceTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+  }, [searchQuery]);
+
+  const fetchStaffTickets = useCallback(async () => {
+    if (!selectedEventId || !session?.access_token || isLoading) return;
+
+    setIsLoading(true);
+    try {
+      // Appel à l'API (on récupère les billets de l'événement)
+      const res = await fetch(`http://localhost:5000/api/auth/tickets?event_id=${selectedEventId}${debouncedSearchQuery ? `&search=${encodeURIComponent(debouncedSearchQuery)}` : ''}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        const currentUserId = user?.id;
+
+        const mapped: Ticket[] = data.tickets
+          // On filtre pour ne garder que les actions (ventes ou scans) effectuées par ce staff
+          .filter((t: any) => t.sold_by === currentUserId || t.scanned_by === currentUserId)
+          .map((t: any) => {
+            let uiStatus: 'Valide' | 'Payé' | 'Utilisé' = 'Valide';
+            if (t.status === 'vendu') uiStatus = 'Payé';
+            else if (t.status === 'utilisé') uiStatus = 'Utilisé';
+            else if (t.status === 'valide' || t.status === 'valid') uiStatus = 'Valide';
+
+            const name = t.holder_name || 'Inconnu';
+            const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+            const type = (t.ticket_type === 'vip' || t.ticket_type === 'VIP') ? 'VIP' : 'Standard';
+
+            const dbPrice = (t.price !== undefined && t.price !== null) ? Number(t.price) : (type === 'VIP' ? TICKET_PRICES.VIP : TICKET_PRICES.Standard);
+            return {
+              id: t.id,
+              displayId: '#' + t.id.slice(0, 8).toUpperCase(),
+              type,
+              holder: { initials, name },
+              status: uiStatus,
+              sellerName: t.sold_by_profile?.first_name ? `${t.sold_by_profile.first_name} ${t.sold_by_profile.last_name}` : 'Système',
+              scannerName: t.scanned_by_profile?.first_name ? `${t.scanned_by_profile.first_name} ${t.scanned_by_profile.last_name}` : 'N/A',
+              price: dbPrice
+            };
+          });
+        setTickets(mapped);
+      } else {
+        showToast(data.error || 'Erreur lors du chargement de vos statistiques', 'error');
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      showToast('Impossible de contacter le serveur', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedEventId, session, showToast, debouncedSearchQuery]);
+
+  useEffect(() => {
+    if (selectedEventId) fetchStaffTickets(); 
+  }, [fetchStaffTickets, selectedEventId, debouncedSearchQuery]);
+
+  // Filtrage pour l'affichage de la liste
+  const filteredTickets = tickets.filter(t => {
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'valid') return t.status === 'Valide';
+    if (filterStatus === 'paid') return t.status === 'Payé';
+    if (filterStatus === 'used') return t.status === 'Utilisé';
+    return true;
+  });
+
+  // Calculs des KPIs basés uniquement sur les actions de cet utilisateur
+  const mySoldTickets = tickets.filter((t) => t.status === 'Payé' || t.status === 'Utilisé'); // billets vendus
+  const myScannedCount = tickets.filter((t) => t.status === 'Utilisé').length; // billets scannés
+  
+  // Calcul du montant total encaissé par ce staff
+  const totalRevenue = mySoldTickets.reduce((sum, t) => sum + t.price, 0);
+
+  const handleShowQrCode = (ticketId: string) => {
+    setQrTicketId(ticketId);
+    setIsQrModalOpen(true);
+  };
+
+  const handleOpenScanner = () => {
+    if (!selectedEventId) {
+      showToast("Veuillez sélectionner un événement actif avant de scanner.", "error");
+      return;
+    }
+    // Ouvre la modale en mode scan
+    setQrTicketId(undefined);
+    setIsQrModalOpen(true);
+  };
+
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen space-y-6">
+        
+        {/* Section Action principale : Scanner un billet */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
+            Espace Scan & Vente Staff
+          </h3>
+          <button
+            className="w-full flex items-center justify-center gap-3 bg-primary text-white px-4 py-4 rounded-xl shadow-md hover:bg-primary/95 active:scale-[0.99] transition-all relative overflow-hidden"
+            onClick={handleOpenScanner}
+          >
+            <span className="material-symbols-outlined text-xl">qr_code_scanner</span>
+            <div className="text-left">
+              <span className="block text-sm font-bold">Scanner un billet</span>
+            </div>
+          </button>
+        </div>
+
+        {/* Grille KPI Responsive dédiée au Staff */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Ventes faites par le staff */}
+          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
+            <div>
+              <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">Mes Billets Vendus</span>
+              <span className="block text-xl font-bold mt-1">{mySoldTickets.length.toLocaleString()}</span>
+            </div>
+            <span className="material-symbols-outlined text-secondary text-lg bg-secondary/5 p-2 rounded-lg">payments</span>
+          </div>
+
+          {/* Scans faits par le staff */}
+          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
+            <div>
+              <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">Mes Billets Scannés</span>
+              <span className="block text-xl font-bold mt-1">{myScannedCount.toLocaleString()}</span>
+            </div>
+            <span className="material-symbols-outlined text-tertiary text-lg bg-tertiary/5 p-2 rounded-lg">qr_code_scanner</span>
+          </div>
+
+          {/* Recette totale collectée par le staff */}
+          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
+            <div>
+              <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">Mon Total Encaissé</span>
+              <span className="block text-xl font-bold mt-1 text-emerald-600">{totalRevenue.toLocaleString()} Ar</span>
+            </div>
+            <span className="material-symbols-outlined text-emerald-600 text-lg bg-emerald-50 p-2 rounded-lg">point_of_sale</span>
+          </div>
+        </div>
+
+        {/* Registre Personnel du Staff */}
+        <section className="space-y-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant/20 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-on-surface">Mon Historique d'Activités</h2>
+              <p className="text-xs text-on-surface-variant">Billets que vous avez personnellement vendus ou scannés.</p>
+            </div>
+            
+            {/* Barre de recherche et filtre fluide */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+              
+              {/* Filtre d'états */}
+              <div className="relative w-full sm:w-48">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
+                  filter_list
+                </span>
+                <select
+                  className="w-full pl-9 pr-8 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs font-semibold appearance-none focus:border-primary focus:outline-none transition-all text-on-surface"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                  <option value="all">Tous mes statuts</option>
+                  <option value="paid">Payé (Vendu)</option>
+                  <option value="used">Utilisé (Scanné)</option>
+                </select>
+              </div>
+
+              {/* Recherche par ID ou nom */}
+              <div className="relative w-full sm:w-64">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
+                  search
+                </span>
+                <input
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs focus:border-primary focus:outline-none transition-all text-on-surface"
+                  placeholder="ID ou détenteur..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  type="text"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Tableau avec protection contre le débordement mobile */}
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+            {isLoading && <LoadingOverlay message="Mise à jour de vos données..." />}
+            {!isLoading && tickets.length === 0 ? (
+              <div className="py-12 text-center text-xs text-on-surface-variant border border-dashed rounded-xl">
+                Aucune activité enregistrée sur cet événement pour le moment.
+              </div>
+            ) : (
+              !isLoading && (
+                <TicketTable
+                  tickets={filteredTickets}
+                  onEditTicket={() => {}} // Optionnel ou désactivé pour le staff simple
+                  onDeleteTicket={() => {}} // Interdit pour le staff
+                  onShowQrCode={handleShowQrCode}
+                />
+              )
+            )}
+          </div>
+        </section>
+      </div>
+
+      <QrCodeModalScan
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        ticketId={qrTicketId}
+        mode={qrTicketId ? 'display' : 'scan'}
+        onScanSuccess={async (decodedText: string) => {
+          // Extract ticket id: if scanned text is a URL, take last path segment
+          let ticketId = decodedText || '';
+          try {
+            const u = new URL(decodedText);
+            const parts = u.pathname.split('/').filter(Boolean);
+            if (parts.length > 0) ticketId = parts[parts.length - 1];
+          } catch (e) {
+            // not a URL, keep decodedText as-is
+          }
+
+          if (!ticketId) {
+            showToast('QR invalide: aucun ID détecté', 'error');
+            return;
+          }
+
+          if (!session?.access_token) {
+            showToast('Vous devez être connecté pour valider un billet', 'error');
+            return;
+          }
+
+          try {
+            const res = await fetch('http://localhost:5000/api/auth/tickets/scan', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ ticket_id: ticketId }),
+            });
+
+            // Try to parse JSON, but if the server returned HTML (index.html) we'll capture it for debugging
+            let data: any = null;
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+              try {
+                data = await res.json();
+              } catch (parseErr) {
+                console.error('Failed to parse JSON response from /tickets/scan:', parseErr);
+                const text = await res.text();
+                console.error('Response text:', text);
+                showToast('Réponse serveur invalide (non-JSON). Voir console.', 'error');
+                return;
+              }
+            } else {
+              // Non-JSON response (likely HTML) — log it and show helpful error
+              const text = await res.text();
+              console.error('Non-JSON response from /tickets/scan:', text);
+              showToast('Erreur serveur: réponse inattendue. Voir console pour détails.', 'error');
+              return;
+            }
+
+            if (data && data.success) {
+              showToast(data.message || 'Billet validé', 'success');
+              // Refresh tickets list
+              await fetchStaffTickets();
+            } else {
+              showToast((data && (data.error || data.message)) || 'Échec de la validation', 'error');
+            }
+          } catch (err) {
+            console.error('Scan API error:', err);
+            showToast('Erreur réseau lors de la validation', 'error');
+          }
+        }}
+      />
+    </>
+  );
+}
