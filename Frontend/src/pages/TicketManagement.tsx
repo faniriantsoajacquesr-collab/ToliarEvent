@@ -8,6 +8,7 @@ import type { BulkConfig } from '../components/BulkGenerationModal';
 import { useAuth } from '../contexts/AuthContext';
 import EditTicketModal from '../components/EditTicketModal';
 import QrCodeModal from '../components/QrCodeModal';
+import { QrCodeModalScan } from '../components/QrCodeModalScan';
 import TicketTypesManagement from '../components/TicketTypesManagement';
 import { authAPI } from '../services/authAPI';
 
@@ -39,6 +40,8 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [qrTicketId, setQrTicketId] = useState<string | null>(null);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [isScanProcessing, setIsScanProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -115,7 +118,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
 
           return {
             id: t.id,
-            displayId: '#' + t.id.slice(0, 8).toUpperCase(),
+            displayId: t.number != null ? `#${t.number}` : '—',
             type: t.ticket_type || 'Standard',
             holder: { initials, name },
             status: uiStatus,
@@ -225,12 +228,12 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
     await deleteTickets(ids);
   };
 
-  const handleBulkUpdateStatus = async (status: 'vendu' | 'valide') => {
+  const handleBulkUpdateStatus = async (status: 'vendu' | 'valid') => {
     if (!session?.access_token) return;
     const ids = Array.from(selectedTicketIds);
     if (ids.length === 0) return;
 
-    const label = status === 'vendu' ? 'vendu' : 'valide';
+    const label = status === 'vendu' ? 'vendu' : 'valid';
     if (!confirm(`Marquer ${ids.length} billet${ids.length > 1 ? 's' : ''} comme ${label} ?`)) return;
 
     setIsBulkUpdating(true);
@@ -256,6 +259,68 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
     setIsQrModalOpen(true);
   };
 
+  const handleOpenScanner = () => {
+    if (!selectedEventId) {
+      showToast("Sélectionnez d'abord un événement avant de scanner.", 'error');
+      return;
+    }
+    setIsScanModalOpen(true);
+  };
+
+  const handleScanSuccess = async (decodedText: string) => {
+    let ticketId = decodedText || '';
+    try {
+      const u = new URL(decodedText);
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length > 0) ticketId = parts[parts.length - 1];
+    } catch {
+      // not a URL, keep decodedText as-is
+    }
+
+    if (!ticketId) {
+      showToast('QR invalide : aucun ID détecté', 'error');
+      return;
+    }
+
+    if (!session?.access_token) {
+      showToast('Vous devez être connecté pour valider un billet', 'error');
+      return;
+    }
+
+    try {
+      setIsScanProcessing(true);
+      const res = await fetch(`${API_URL}/tickets/scan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ ticket_id: ticketId, event_id: selectedEventId }),
+      });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await res.text();
+        console.error('Non-JSON response from /tickets/scan:', text);
+        showToast('Erreur serveur : réponse inattendue.', 'error');
+        return;
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || 'Billet validé', 'success');
+        await fetchTickets(true);
+      } else {
+        showToast(data.error || data.message || 'Échec de la validation', 'error');
+      }
+    } catch (err) {
+      console.error('Scan API error:', err);
+      showToast('Erreur réseau lors de la validation', 'error');
+    } finally {
+      setIsScanProcessing(false);
+    }
+  };
+
   const typeFilterOptions = Array.from(
     new Set([
       ...ticketTypeOptions,
@@ -265,6 +330,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
 
   return (
     <>
+      {isScanProcessing && <LoadingOverlay message="Traitement du scan..." />}
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen space-y-6">
         <div className="rounded-3xl border border-outline-variant/30 bg-surface p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -294,22 +360,33 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
               <h3 className="text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
                 Actions de Billetterie
               </h3>
-              <button
-                className="w-full flex items-center justify-center gap-3 bg-primary text-white px-4 py-4 rounded-xl shadow-sm hover:bg-primary/95 active:scale-[0.99] transition-all group overflow-hidden relative"
-                onClick={() => {
-                  if (!selectedEventId) {
-                    showToast("Sélectionnez d'abord un événement dans la section 'Événements'", 'error');
-                    return;
-                  }
-                  const url = `/badge-editor?eventId=${encodeURIComponent(selectedEventId)}`;
-                  window.open(url, '_blank');
-                }}
-              >
-                <span className="material-symbols-outlined text-xl">confirmation_number</span>
-                <div className="text-left">
-                  <span className="block text-sm font-bold">Générer des billets</span>
-                </div>
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  className="w-full flex items-center justify-center gap-3 bg-primary text-white px-4 py-4 rounded-xl shadow-sm hover:bg-primary/95 active:scale-[0.99] transition-all group overflow-hidden relative"
+                  onClick={() => {
+                    if (!selectedEventId) {
+                      showToast("Sélectionnez d'abord un événement dans la section 'Événements'", 'error');
+                      return;
+                    }
+                    const url = `/badge-editor?eventId=${encodeURIComponent(selectedEventId)}`;
+                    window.open(url, '_blank');
+                  }}
+                >
+                  <span className="material-symbols-outlined text-xl">confirmation_number</span>
+                  <div className="text-left">
+                    <span className="block text-sm font-bold">Générer des billets</span>
+                  </div>
+                </button>
+                <button
+                  className="w-full flex items-center justify-center gap-3 bg-tertiary text-white px-4 py-4 rounded-xl shadow-md hover:bg-tertiary/95 active:scale-[0.99] transition-all"
+                  onClick={handleOpenScanner}
+                >
+                  <span className="material-symbols-outlined text-xl">qr_code_scanner</span>
+                  <div className="text-left">
+                    <span className="block text-sm font-bold">Scanner un billet</span>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -382,7 +459,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
                     </span>
                     <input
                       className="w-full pl-9 pr-4 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs focus:border-primary focus:outline-none transition-all text-on-surface"
-                      placeholder="ID, détenteur ou vendeur..."
+                      placeholder="N°, détenteur ou vendeur..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       type="text"
@@ -415,7 +492,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleBulkUpdateStatus('valide')}
+                      onClick={() => handleBulkUpdateStatus('valid')}
                       className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50"
                       disabled={isDeleting || isBulkUpdating}
                     >
@@ -469,6 +546,13 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
       />
 
       <QrCodeModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} ticketId={qrTicketId} />
+
+      <QrCodeModalScan
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        mode="scan"
+        onScanSuccess={handleScanSuccess}
+      />
     </>
   );
 }

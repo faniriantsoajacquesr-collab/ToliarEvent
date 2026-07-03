@@ -30,6 +30,7 @@ export default function StaffTicketManagement({ selectedEventId }: { selectedEve
   const [qrTicketId, setQrTicketId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isScanProcessing, setIsScanProcessing] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,7 +82,7 @@ export default function StaffTicketManagement({ selectedEventId }: { selectedEve
             const dbPrice = (t.price !== undefined && t.price !== null) ? Number(t.price) : (type === 'VIP' ? TICKET_PRICES.VIP : TICKET_PRICES.Standard);
             return {
               id: t.id,
-              displayId: '#' + t.id.slice(0, 8).toUpperCase(),
+              displayId: t.number != null ? `#${t.number}` : '—',
               type,
               holder: { initials, name },
               status: uiStatus,
@@ -155,8 +156,73 @@ export default function StaffTicketManagement({ selectedEventId }: { selectedEve
     setIsQrModalOpen(true);
   };
 
+  const handleScanSuccess = async (decodedText: string) => {
+    let ticketId = decodedText || '';
+    try {
+      const u = new URL(decodedText);
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length > 0) ticketId = parts[parts.length - 1];
+    } catch {
+      // not a URL, keep decodedText as-is
+    }
+
+    if (!ticketId) {
+      showToast('QR invalide: aucun ID détecté', 'error');
+      return;
+    }
+
+    if (!session?.access_token) {
+      showToast('Vous devez être connecté pour valider un billet', 'error');
+      return;
+    }
+
+    try {
+      setIsScanProcessing(true);
+      const res = await fetch(`${API_URL}/tickets/scan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ ticket_id: ticketId, event_id: selectedEventId }),
+      });
+
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          console.error('Failed to parse JSON response from /tickets/scan:', parseErr);
+          const text = await res.text();
+          console.error('Response text:', text);
+          showToast('Réponse serveur invalide (non-JSON). Voir console.', 'error');
+          return;
+        }
+      } else {
+        const text = await res.text();
+        console.error('Non-JSON response from /tickets/scan:', text);
+        showToast('Erreur serveur: réponse inattendue. Voir console pour détails.', 'error');
+        return;
+      }
+
+      if (data && data.success) {
+        showToast(data.message || 'Billet validé', 'success');
+        await fetchStaffTickets(true);
+      } else {
+        showToast((data && (data.error || data.message)) || 'Échec de la validation', 'error');
+      }
+    } catch (err) {
+      console.error('Scan API error:', err);
+      showToast('Erreur réseau lors de la validation', 'error');
+    } finally {
+      setIsScanProcessing(false);
+    }
+  };
+
   return (
     <>
+      {isScanProcessing && <LoadingOverlay message="Traitement du scan..." />}
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen space-y-6">
         
         {/* Section Action principale : Scanner un billet */}
@@ -239,7 +305,7 @@ export default function StaffTicketManagement({ selectedEventId }: { selectedEve
                 </span>
                 <input
                   className="w-full pl-9 pr-4 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs focus:border-primary focus:outline-none transition-all text-on-surface"
-                      placeholder="ID, détenteur ou vendeur..."
+                  placeholder="N°, détenteur ou vendeur..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   type="text"
@@ -275,70 +341,7 @@ export default function StaffTicketManagement({ selectedEventId }: { selectedEve
         onClose={() => setIsQrModalOpen(false)}
         ticketId={qrTicketId}
         mode={qrTicketId ? 'display' : 'scan'}
-        onScanSuccess={async (decodedText: string) => {
-          // Extract ticket id: if scanned text is a URL, take last path segment
-          let ticketId = decodedText || '';
-          try {
-            const u = new URL(decodedText);
-            const parts = u.pathname.split('/').filter(Boolean);
-            if (parts.length > 0) ticketId = parts[parts.length - 1];
-          } catch (e) {
-            // not a URL, keep decodedText as-is
-          }
-
-          if (!ticketId) {
-            showToast('QR invalide: aucun ID détecté', 'error');
-            return;
-          }
-
-          if (!session?.access_token) {
-            showToast('Vous devez être connecté pour valider un billet', 'error');
-            return;
-          }
-
-          try {
-            const res = await fetch(`${API_URL}/tickets/scan`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: JSON.stringify({ ticket_id: ticketId }),
-            });
-
-            // Try to parse JSON, but if the server returned HTML (index.html) we'll capture it for debugging
-            let data: any = null;
-            const contentType = res.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-              try {
-                data = await res.json();
-              } catch (parseErr) {
-                console.error('Failed to parse JSON response from /tickets/scan:', parseErr);
-                const text = await res.text();
-                console.error('Response text:', text);
-                showToast('Réponse serveur invalide (non-JSON). Voir console.', 'error');
-                return;
-              }
-            } else {
-              // Non-JSON response (likely HTML) — log it and show helpful error
-              const text = await res.text();
-              console.error('Non-JSON response from /tickets/scan:', text);
-              showToast('Erreur serveur: réponse inattendue. Voir console pour détails.', 'error');
-              return;
-            }
-
-            if (data && data.success) {
-              showToast(data.message || 'Billet validé', 'success');
-              // Refresh tickets list
-              await fetchStaffTickets();
-            } else {
-              showToast((data && (data.error || data.message)) || 'Échec de la validation', 'error');
-            }
-          } catch (err) {
-            console.error('Scan API error:', err);
-            showToast('Erreur réseau lors de la validation', 'error');
-          }
-        }}
+        onScanSuccess={handleScanSuccess}
       />
     </>
   );

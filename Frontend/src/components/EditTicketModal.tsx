@@ -19,7 +19,7 @@ export default function EditTicketModal({ isOpen, onClose, ticketId, eventId, on
     holder_name: '',
     ticket_type: 'standard',
     price: 0,
-    status: 'valide',
+    status: 'valid',
   });
   const [isLoading, setIsLoading] = useState(false);
   // originalTicket removed: not read elsewhere
@@ -43,7 +43,7 @@ export default function EditTicketModal({ isOpen, onClose, ticketId, eventId, on
               holder_name: ticket.holder_name || '',
               ticket_type: ticket.ticket_type || 'standard',
               price: ticket.price || 0,
-              status: ticket.status || 'valide',
+              status: (ticket.status === 'valide' ? 'valid' : ticket.status) || 'valid',
             });
           } else {
             showToast(data.error || 'Billet introuvable pour édition.', 'error');
@@ -122,7 +122,7 @@ export default function EditTicketModal({ isOpen, onClose, ticketId, eventId, on
             <div>
               <label htmlFor="status" className="block text-sm font-medium text-gray-700">Statut</label>
               <select name="status" id="status" value={formData.status} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
-                <option value="valide">Valide</option>
+                <option value="valid">Valide</option>
                 <option value="vendu">Vendu</option>
                 <option value="utilisé">Utilisé</option>
               </select>

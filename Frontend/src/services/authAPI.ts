@@ -617,7 +617,7 @@ export const authAPI = {
     return response.json();
   },
 
-  async bulkUpdateTicketStatus(ticketIds: string[], status: 'vendu' | 'valide', accessToken: string) {
+  async bulkUpdateTicketStatus(ticketIds: string[], status: 'vendu' | 'valid', accessToken: string) {
     const response = await fetch(`${API_URL}/tickets/bulk-update-status`, {
       method: 'POST',
       headers: {

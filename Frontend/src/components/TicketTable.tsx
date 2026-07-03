@@ -124,7 +124,7 @@ export default function TicketTable({
                 </th>
               )}
               <th className="px-xl py-md font-label-md text-label-md text-on-surface-variant">
-                Ticket ID
+                N°
               </th>
               <th className="px-xl py-md font-label-md text-label-md text-on-surface-variant">
                 Type

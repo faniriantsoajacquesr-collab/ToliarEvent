@@ -63,26 +63,6 @@ export default function Home() {
               Voir les événements
             </button>
           </div>
-          <div className="mt-xl flex items-center gap-md">
-            <div className="flex -space-x-2">
-              <img
-                className="w-10 h-10 rounded-full border-2 border-surface"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJmF6ZXSydVKH19BqvKuJcJoHT9t9g4t_SF5E3x7Olh72S6zFF1GFbfRLANXHi3SnFCAo_tI3BZhvjV7R7iwzRMp0KXGmW71vFZyqq5M4lvcWhigqL5mYH33IHPyzkAPHq99bBMYWnPuLBkIXooCqZ_e2d3D7jSxy7SWskJ1D5N9o_QPD8i9vwbfjQUWZwnrP_ytx9hZ_psz2LbfIAfmJrL5BkUFLjcqXWO8wR3I6Axwb_v-CKZyFubgQPIBHW2fHopBpipIE_NKs"
-                alt="User"
-              />
-              <img
-                className="w-10 h-10 rounded-full border-2 border-surface"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuB4q_yptGfYBZ4b7cwq7hDScSlYvBjzUpVehWuuZKwjrBnnwYRS4xic0_QvJ3Czd0xhU35BNkstweDmh8LKTl1RxjSTHccb78UkFW6dZ9eyaWa80p3QtOMOYoQsXT1S3j2wpvl8dLuocTjFCvfRicAKMKg_AfwpvbVIWQXxoLXKG4Rcp1zOwiZUom6ev6RWF2_1ad0c5D4EHyUxV25mYCXF7iYD2mCve92NpaH5T0DWn18VkWofHurev5bcgpjquqt8uezvgjvzK7M"
-                alt="User"
-              />
-              <div className="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed font-bold text-xs">
-                +12
-              </div>
-            </div>
-            <p className="font-label-md text-label-md text-on-surface-variant">
-              Rejoint par +200 organisateurs locaux
-            </p>
-          </div>
         </div>
         <div className="relative group">
           <div className="absolute -inset-4 bg-gradient-to-tr from-primary/20 to-tertiary/20 blur-3xl rounded-full opacity-50 group-hover:opacity-70 transition-opacity" />

@@ -2709,6 +2709,93 @@ async function resolveTicketSearchIds(db, eventId, ticketType, search) {
   return filterTicketIdsBySearch(searchableTickets || [], search);
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SCANNED_STATUSES = new Set(['utilisé', 'utilise', 'used']);
+const VALID_STATUSES = new Set(['valid', 'valide']);
+const SOLD_STATUSES = new Set(['vendu']);
+
+function isTicketValidStatus(status) {
+  return VALID_STATUSES.has(String(status || '').toLowerCase());
+}
+
+function ticketValidResetPayload(now = new Date().toISOString()) {
+  return {
+    status: 'valid',
+    sold_by: null,
+    scanned_by: null,
+    updated_at: now,
+  };
+}
+
+async function resolveTicketByScanInput(dbAdmin, rawTicketId, eventId) {
+  const cleaned = sanitizeTicketSearchInput(rawTicketId);
+  if (!cleaned) return { ticket: null };
+
+  if (UUID_REGEX.test(cleaned)) {
+    let query = dbAdmin.from('tickets').select('*').eq('id', cleaned);
+    if (eventId) query = query.eq('event_id', eventId);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    return { ticket: data || null };
+  }
+
+  if (!eventId) {
+    return { ticket: null, needsEventId: true };
+  }
+
+  const { data: tickets, error } = await dbAdmin
+    .from('tickets')
+    .select('*')
+    .eq('event_id', eventId);
+  if (error) throw error;
+
+  const hexSearch = cleaned.replace(/-/g, '').toLowerCase();
+  const matches = (tickets || []).filter((ticket) =>
+    ticket.id.replace(/-/g, '').toLowerCase().startsWith(hexSearch)
+  );
+
+  if (matches.length === 1) return { ticket: matches[0] };
+  if (matches.length > 1) return { ticket: null, ambiguous: true, count: matches.length };
+  return { ticket: null };
+}
+
+async function canUserScanTicketsForEvent(dbAdmin, userId, eventId) {
+  const { data: eventData, error: eventError } = await dbAdmin
+    .from('events')
+    .select('organization_id')
+    .eq('id', eventId)
+    .single();
+  if (eventError || !eventData) return { allowed: false, reason: 'event_not_found' };
+
+  const { data: memberRows } = await dbAdmin
+    .from('organization_members')
+    .select('role')
+    .eq('organization_id', eventData.organization_id)
+    .eq('profile_id', userId)
+    .limit(1);
+
+  if (memberRows?.length && memberRows[0].role === 'admin') {
+    return { allowed: true, role: 'admin' };
+  }
+
+  const { data: staffRows } = await dbAdmin
+    .from('event_staff')
+    .select('status')
+    .eq('event_id', eventId)
+    .eq('profile_id', userId)
+    .limit(1);
+
+  const staffStatus = (staffRows?.[0]?.status || '').toLowerCase();
+  if (
+    staffRows?.length &&
+    (staffStatus === 'valide' || staffStatus === 'validé' || staffStatus.includes('valid'))
+  ) {
+    return { allowed: true, role: 'staff' };
+  }
+
+  return { allowed: false, reason: 'forbidden' };
+}
+
 /**
  * GET /api/auth/tickets
  * Query: ?event_id=UUID
@@ -2853,7 +2940,7 @@ router.post('/tickets/bulk-delete', async (req, res) => {
 
 /**
  * POST /api/auth/tickets/bulk-update-status
- * Body: { ticket_ids: string[], status: 'vendu' | 'valide' }
+ * Body: { ticket_ids: string[], status: 'vendu' | 'valid' }
  */
 router.post('/tickets/bulk-update-status', async (req, res) => {
   try {
@@ -2864,8 +2951,9 @@ router.post('/tickets/bulk-update-status', async (req, res) => {
     if (!Array.isArray(ticket_ids) || ticket_ids.length === 0) {
       return res.status(400).json({ success: false, error: 'ticket_ids requis (tableau non vide)' });
     }
-    if (!['vendu', 'valide'].includes(status)) {
-      return res.status(400).json({ success: false, error: 'status doit être vendu ou valide' });
+    const normalizedStatus = status === 'valide' ? 'valid' : status;
+    if (!['vendu', 'valid'].includes(normalizedStatus)) {
+      return res.status(400).json({ success: false, error: 'status doit être vendu ou valid' });
     }
 
     const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
@@ -2920,16 +3008,16 @@ router.post('/tickets/bulk-update-status', async (req, res) => {
 
     const now = new Date().toISOString();
     const updatePayload =
-      status === 'vendu'
+      normalizedStatus === 'vendu'
         ? { status: 'vendu', sold_by: authData.user.id, updated_at: now }
-        : { status: 'valide', sold_by: null, updated_at: now };
+        : ticketValidResetPayload(now);
 
     const eligibleIds = eligibleTickets.map((t) => t.id);
     const { error: updateError } = await admin.from('tickets').update(updatePayload).in('id', eligibleIds);
 
     if (updateError) return res.status(400).json({ success: false, error: updateError.message });
 
-    const actionLabel = status === 'vendu' ? 'marqué(s) comme vendu' : 'marqué(s) comme valide';
+    const actionLabel = normalizedStatus === 'vendu' ? 'marqué(s) comme vendu' : 'marqué(s) comme valid';
     return res.json({
       success: true,
       updated_count: eligibleIds.length,
@@ -2939,6 +3027,111 @@ router.post('/tickets/bulk-update-status', async (req, res) => {
   } catch (error) {
     console.error('Erreur POST tickets/bulk-update-status:', error);
     res.status(500).json({ success: false, error: 'Erreur lors de la mise à jour des billets.' });
+  }
+});
+
+/**
+ * POST /api/auth/tickets/scan
+ * Body: { ticket_id: string, event_id?: string }
+ * valide → vendu, vendu → utilisé (admin org ou staff validé)
+ */
+router.post('/tickets/scan', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { ticket_id, event_id } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!ticket_id) return res.status(400).json({ success: false, error: 'ticket_id requis' });
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) {
+      return res.status(401).json({ success: false, error: 'Authentification invalide' });
+    }
+
+    const dbAdmin = supabase.admin;
+    if (!dbAdmin) {
+      return res.status(500).json({ success: false, error: 'Configuration serveur incomplète' });
+    }
+
+    const resolved = await resolveTicketByScanInput(dbAdmin, ticket_id, event_id || null);
+    if (resolved.needsEventId) {
+      return res.status(400).json({
+        success: false,
+        error: 'ID de billet incomplet : sélectionnez un événement ou scannez le QR complet.',
+      });
+    }
+    if (resolved.ambiguous) {
+      return res.status(400).json({
+        success: false,
+        error: `Plusieurs billets correspondent (${resolved.count}). Utilisez le QR code complet.`,
+      });
+    }
+
+    const ticket = resolved.ticket;
+    if (!ticket) {
+      return res.status(404).json({ success: false, error: 'Billet introuvable.' });
+    }
+
+    const access = await canUserScanTicketsForEvent(dbAdmin, authData.user.id, ticket.event_id);
+    if (!access.allowed) {
+      if (access.reason === 'event_not_found') {
+        return res.status(404).json({ success: false, error: 'Événement du billet introuvable.' });
+      }
+      return res.status(403).json({
+        success: false,
+        error: 'Accès refusé : seuls les administrateurs ou le staff validé peuvent scanner des billets.',
+      });
+    }
+
+    const statusNorm = String(ticket.status || '').toLowerCase();
+    if (SCANNED_STATUSES.has(statusNorm)) {
+      return res.status(409).json({
+        success: false,
+        error: 'Ce billet a déjà été utilisé à l\'entrée.',
+        ticket: { id: ticket.id, status: ticket.status, scanned_by: ticket.scanned_by },
+      });
+    }
+
+    const now = new Date().toISOString();
+    let updatePayload;
+    let successMessage;
+
+    if (VALID_STATUSES.has(statusNorm)) {
+      updatePayload = { status: 'vendu', sold_by: authData.user.id, updated_at: now };
+      successMessage = `Billet marqué comme vendu pour ${ticket.holder_name || 'Participant'}.`;
+    } else if (SOLD_STATUSES.has(statusNorm)) {
+      updatePayload = { status: 'utilisé', scanned_by: authData.user.id, updated_at: now };
+      successMessage = `Billet validé à l'entrée pour ${ticket.holder_name || 'Participant'}.`;
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: `Ce billet ne peut pas être scanné (statut actuel : ${ticket.status || 'inconnu'}).`,
+      });
+    }
+
+    const { data: updated, error: updateError } = await dbAdmin
+      .from('tickets')
+      .update(updatePayload)
+      .eq('id', ticket.id)
+      .select(`
+        *,
+        sold_by_profile:profiles!tickets_sold_by_fkey(first_name, last_name),
+        scanned_by_profile:profiles!tickets_scanned_by_fkey(first_name, last_name)
+      `)
+      .single();
+
+    if (updateError) {
+      return res.status(400).json({ success: false, error: updateError.message });
+    }
+
+    return res.json({
+      success: true,
+      message: successMessage,
+      ticket: updated,
+    });
+  } catch (error) {
+    console.error('Erreur POST tickets/scan:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors de la validation du billet.' });
   }
 });
 
@@ -3043,8 +3236,22 @@ router.put('/tickets/:id', async (req, res) => {
     const { data: memberRows } = await db.from('organization_members').select('role').eq('organization_id', eventData.organization_id).eq('profile_id', authData.user.id).limit(1);
     if (!memberRows || memberRows.length === 0 || memberRows[0].role !== 'admin') return res.status(403).json({ success: false, error: 'Accès refusé: administrateur requis pour modifier des billets.' });
 
-    const updateData = { holder_name, ticket_type, price, status, updated_at: new Date().toISOString() };
-    const { data: updatedTicket, error: updateError } = await db.from('tickets').update(updateData).eq('id', id).select().single();
+    const now = new Date().toISOString();
+    const normalizedStatus = isTicketValidStatus(status) ? 'valid' : status;
+    const updateData = {
+      holder_name,
+      ticket_type,
+      price,
+      status: normalizedStatus,
+      updated_at: now,
+    };
+    if (isTicketValidStatus(status)) {
+      updateData.sold_by = null;
+      updateData.scanned_by = null;
+    }
+
+    const admin = supabase.admin || supabase;
+    const { data: updatedTicket, error: updateError } = await admin.from('tickets').update(updateData).eq('id', id).select().single();
 
     if (updateError) return res.status(400).json({ success: false, error: updateError.message });
     return res.json({ success: true, ticket: updatedTicket });
@@ -4362,7 +4569,7 @@ async function devalidateSingleOrder(db, admin, authUserId, orderId) {
 
   const { error: ticketsUpdateError } = await admin
     .from('tickets')
-    .update({ status: 'valide', sold_by: null, updated_at: now })
+    .update(ticketValidResetPayload(now))
     .in('id', ticketIds);
 
   if (ticketsUpdateError) {
