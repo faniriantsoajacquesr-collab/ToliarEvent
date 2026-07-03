@@ -9,7 +9,7 @@ const defaultData = {
   title: 'Événement à Toliara',
   heroTitle: 'Présentation de l’événement',
   heroSubtitle: 'Découvrez tous les détails et réservez votre place.',
-  customButtonText: 'En savoir plus',
+  customButtonText: 'Acheter un billet',
   dateText: 'Date à venir',
   publicDescription: 'Retrouvez ici les informations officielles et l’ambiance de l’événement.',
   heroImage: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',

@@ -79,7 +79,8 @@ export default function PublicationTemplate({
     ? 'w-full max-w-full rounded-[2.5rem] bg-background overflow-hidden'
     : 'w-full rounded-[2.5rem] bg-background shadow-xl overflow-hidden';
     
-  const heroGridClass = (templateStyle === 'split' && !isMobileMode) ? 'grid-cols-1 md:grid-cols-2 items-center' : 'grid-cols-1';
+  const isSplitDesktop = templateStyle === 'split' && !isMobileMode;
+  const heroGridClass = isSplitDesktop ? 'grid-cols-1 md:grid-cols-2 items-center' : 'grid-cols-1';
   const heroSpacing = templateStyle === 'compact' ? 'py-6 md:py-12' : 'py-10 md:py-20';
 
   return (
@@ -100,7 +101,7 @@ export default function PublicationTemplate({
             
             <div className={`w-full mx-auto px-4 ${heroSpacing} relative z-10 grid gap-6 md:gap-12 ${heroGridClass}`}>
               
-              <div className={`w-full flex justify-center ${(templateStyle === 'split' && !isMobileMode) ? 'order-1 md:order-2' : 'order-1'}`}>
+              <div className={`w-full flex justify-center ${isSplitDesktop ? 'order-1 md:order-2' : 'order-1'}`}>
                 <div className="rounded-2xl overflow-hidden border-2 md:border-4 border-white shadow-lg bg-surface-container w-full max-w-sm md:max-w-md">
                   <img 
                     className="w-full h-auto object-contain max-h-[500px] md:max-h-[600px] block" 
@@ -110,12 +111,12 @@ export default function PublicationTemplate({
                 </div>
               </div>
 
-              <div className={`flex flex-col justify-center ${(templateStyle === 'split' && !isMobileMode) ? 'text-center md:text-left order-2 md:order-1' : 'items-center text-center'}`}>
+              <div className={`flex flex-col justify-center ${isSplitDesktop ? 'items-center md:items-start text-center md:text-left order-2 md:order-1' : 'items-center text-center'}`}>
                 <span className={`inline-block px-3 py-1 rounded-full ${accent.button} text-xs font-semibold tracking-wide mb-4`}>
                   {dateText}
                 </span>
                 {location ? (
-                  <div className="flex items-center justify-center gap-2 text-xs md:text-sm text-on-surface-variant uppercase tracking-[0.2em] mb-2">
+                  <div className={`flex items-center gap-2 text-xs md:text-sm text-on-surface-variant uppercase tracking-[0.2em] mb-2 ${isSplitDesktop ? 'justify-center md:justify-start' : 'justify-center'}`}>
                     <span className="material-symbols-outlined text-base">place</span>
                     <span>{location}</span>
                   </div>
@@ -133,13 +134,13 @@ export default function PublicationTemplate({
                   {publicDescription}
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto px-4 sm:px-0 justify-center">
-                  <a className={`${accent.button} w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform text-sm`} href="#tickets">
+                <div className={`flex w-full px-4 sm:px-0 ${isSplitDesktop ? 'justify-center md:justify-start' : 'justify-center'}`}>
+                  <a
+                    className={`${accent.button} inline-flex items-center justify-center rounded-xl font-bold shadow-md active:scale-95 transition-transform w-full max-w-sm sm:max-w-md px-8 py-4 text-base md:text-lg tracking-wide ${isSplitDesktop ? 'md:min-w-[320px] md:max-w-none' : ''}`}
+                    href="#tickets"
+                  >
                     {customButtonText}
                   </a>
-                  <button className="bg-surface-container-highest text-on-surface w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-sm hover:bg-surface-container-high transition-colors">
-                    En savoir plus
-                  </button>
                 </div>
               </div>
 
