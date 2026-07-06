@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { API_URL } from '../config/api';
 import { authAPI } from '../services/authAPI';
 import { resolveAppEntryPath } from '../utils/appRouting';
+import PasswordInput from '../components/PasswordInput';
 
 interface LoginFormData {
   email: string;
@@ -94,9 +95,8 @@ export default function LoginPage() {
             <label htmlFor="password" className="block text-label-md font-semibold text-on-surface mb-sm">
               Mot de passe
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               name="password"
               value={formData.password}
               onChange={handleInputChange}

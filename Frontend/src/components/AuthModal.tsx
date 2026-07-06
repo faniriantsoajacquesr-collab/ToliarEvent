@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import LegalAcceptanceCheckbox from './LegalAcceptanceCheckbox';
+import PasswordInput from './PasswordInput';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -57,7 +58,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         navigate(entryPath);
       } else {
         await signup(email, password);
-        setSuccessMessage('Compte créé ! Vérifiez votre email pour confirmer.');
+        setSuccessMessage(
+          `Un e-mail de vérification a été envoyé à ${email}. Vérifiez votre boîte de réception et le dossier SPAM, puis cliquez sur le lien de vérification.`
+        );
         setIsLogin(true);
         setPassword('');
         setConfirmPassword('');
@@ -134,11 +137,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             <label className="font-label-md text-label-md text-on-surface-variant ml-xs">
               Mot de passe
             </label>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-md py-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none"
               placeholder="••••••••"
               required
             />
@@ -149,11 +150,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <label className="font-label-md text-label-md text-on-surface-variant ml-xs">
                 Confirmer le mot de passe
               </label>
-              <input
-                type="password"
+              <PasswordInput
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-md py-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none"
                 placeholder="••••••••"
                 required
               />

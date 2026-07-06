@@ -80,6 +80,14 @@ const confirmEmailSuccessResponse = (res, user, session) => {
 };
 
 /**
+ * URL du frontend (sans slash final)
+ */
+const getFrontendUrl = () => {
+  const url = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  return url;
+};
+
+/**
  * Extraire le token du header Authorization
  */
 const extractBearerToken = (authHeader) => {
@@ -97,5 +105,6 @@ module.exports = {
   loginSuccessResponse,
   signupSuccessResponse,
   confirmEmailSuccessResponse,
+  getFrontendUrl,
   extractBearerToken,
 };

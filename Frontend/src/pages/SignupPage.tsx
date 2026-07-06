@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { API_URL } from '../config/api';
 import LegalAcceptanceCheckbox from '../components/LegalAcceptanceCheckbox';
+import PasswordInput from '../components/PasswordInput';
 
 interface SignupFormData {
   email: string;
@@ -10,7 +11,6 @@ interface SignupFormData {
 }
 
 export default function SignupPage() {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState<SignupFormData>({
     email: '',
     password: '',
@@ -80,34 +80,9 @@ export default function SignupPage() {
         return;
       }
 
-      setSuccess('Inscription réussie! Connexion en cours...');
-
-      // Essayer de connecter automatiquement l'utilisateur
-      try {
-        const loginRes = await fetch(`${API_URL}/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email, password: formData.password }),
-        });
-        const loginData = await loginRes.json();
-
-        if (loginData.success) {
-          localStorage.setItem('access_token', loginData.session.access_token);
-          localStorage.setItem('refresh_token', loginData.session.refresh_token);
-          localStorage.setItem('user', JSON.stringify(loginData.user));
-
-          // Rediriger vers la complétion du profil
-          navigate('/complete-profile');
-        } else {
-          // Si login automatique échoue, renvoyer l'utilisateur vers la page de connexion
-          setSuccess('Inscription réussie. Veuillez vous connecter.');
-          setTimeout(() => navigate('/login'), 2000);
-        }
-      } catch (err) {
-        console.error('Auto-login failed:', err);
-        setSuccess('Inscription réussie. Veuillez vous connecter.');
-        setTimeout(() => navigate('/login'), 2000);
-      }
+      setSuccess(
+        `Un e-mail de vérification a été envoyé à ${formData.email}. Vérifiez votre boîte de réception et le dossier SPAM, puis cliquez sur le lien de vérification.`
+      );
     } catch (err) {
       setError('Erreur serveur. Veuillez réessayer.');
       console.error(err);
@@ -149,9 +124,8 @@ export default function SignupPage() {
             <label htmlFor="password" className="block text-label-md font-semibold text-on-surface mb-sm">
               Mot de passe
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               name="password"
               value={formData.password}
               onChange={handleInputChange}
@@ -166,9 +140,8 @@ export default function SignupPage() {
             <label htmlFor="confirmPassword" className="block text-label-md font-semibold text-on-surface mb-sm">
               Confirmer le mot de passe
             </label>
-            <input
+            <PasswordInput
               id="confirmPassword"
-              type="password"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleInputChange}

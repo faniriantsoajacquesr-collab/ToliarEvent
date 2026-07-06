@@ -1,4 +1,5 @@
 const supabase = require('../utils/supabase');
+const { getFrontendUrl } = require('../utils/helpers');
 
 /**
  * Contrôleur pour la gestion de l'authentification
@@ -27,7 +28,7 @@ const signup = async (req, res) => {
       email,
       password,
       options: {
-        emailRedirectTo: `${process.env.FRONTEND_URL}/auth/confirm-email`,
+        emailRedirectTo: `${getFrontendUrl()}/auth/confirm-email`,
         data: metadata,
       },
     });
@@ -228,7 +229,7 @@ const forgotPassword = async (req, res) => {
     }
 
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.FRONTEND_URL}/auth/reset-password`,
+      redirectTo: `${getFrontendUrl()}/auth/reset-password`,
     });
 
     if (error) {

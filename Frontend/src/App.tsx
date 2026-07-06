@@ -22,6 +22,8 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import PublicLayout from './components/PublicLayout';
 import LegalLayout from './components/LegalLayout';
+import ConfirmEmailPage from './pages/ConfirmEmailPage';
+import QueryToastHandler from './components/QueryToastHandler';
 import PageTitle from './components/PageTitle';
 import { normalizeHash } from './hooks/usePublicNav';
 
@@ -88,6 +90,7 @@ function App() {
       <ToastProvider>
       <Router>
         <PageTitle />
+        <QueryToastHandler />
         <HashRedirect />
         <Routes>
           <Route element={<PublicLayout />}>
@@ -98,6 +101,7 @@ function App() {
             <Route path="/contact" element={<Navigate to="/#contact" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/auth/confirm-email" element={<ConfirmEmailPage />} />
             <Route path="/events-list" element={<Navigate to="/evenements" replace />} />
             <Route path="/events/:eventId" element={<LegacyPublicEventRedirect />} />
             <Route path="/badge-editor" element={<TicketBadgeEditor />} />
