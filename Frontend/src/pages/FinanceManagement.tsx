@@ -49,6 +49,10 @@ const emptyForm = (type: 'expense' | 'revenue', eventId: string): FinanceFormSta
 
 type FinanceTransaction = Transaction & { categoryId: string };
 
+function formatAmount(amount: number): string {
+  return `${amount.toLocaleString('fr-FR')} Ar`;
+}
+
 const mapTransaction = (item: any): FinanceTransaction => ({
   id: String(item.id),
   date: item.date ? new Date(item.date).toLocaleDateString('fr-FR') : '',
@@ -240,11 +244,7 @@ export default function FinanceManagement() {
               </div>
             </div>
             <div className="text-headline-lg font-headline-lg text-on-surface">
-              {(stats.totalBudget / 1000000).toLocaleString('fr-FR', {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1,
-              })}{' '}
-              <span className="text-body-md font-bold opacity-60">M Ar</span>
+              {formatAmount(stats.totalBudget)}
             </div>
           </div>
 
@@ -256,11 +256,7 @@ export default function FinanceManagement() {
               </div>
             </div>
             <div className="text-headline-lg font-headline-lg text-on-surface">
-              {(stats.totalExpenses / 1000000).toLocaleString('fr-FR', {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1,
-              })}{' '}
-              <span className="text-body-md font-bold opacity-60">M Ar</span>
+              {formatAmount(stats.totalExpenses)}
             </div>
           </div>
 
@@ -272,11 +268,7 @@ export default function FinanceManagement() {
               </div>
             </div>
             <div className={`text-headline-lg font-headline-lg ${stats.netProfit >= 0 ? 'text-green-600' : 'text-error'}`}>
-              {stats.netProfit >= 0 ? '+' : ''}{(stats.netProfit / 1000000).toLocaleString('fr-FR', {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1,
-              })}{' '}
-              <span className="text-body-md font-bold opacity-60">M Ar</span>
+              {stats.netProfit >= 0 ? '+' : ''}{formatAmount(stats.netProfit)}
             </div>
           </div>
         </section>
