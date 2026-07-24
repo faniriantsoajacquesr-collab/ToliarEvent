@@ -21,6 +21,14 @@ export function mapTicketDbStatusToUi(status: string | null | undefined): Ticket
   return 'Valide';
 }
 
+export function sortTicketsByNumberDesc<T extends { number?: number | null }>(tickets: T[]): T[] {
+  return [...tickets].sort((a, b) => {
+    const numA = a.number ?? Number.NEGATIVE_INFINITY;
+    const numB = b.number ?? Number.NEGATIVE_INFINITY;
+    return numB - numA;
+  });
+}
+
 export function parseTicketIdFromQr(decodedText: string): string {
   let ticketId = decodedText || '';
   try {

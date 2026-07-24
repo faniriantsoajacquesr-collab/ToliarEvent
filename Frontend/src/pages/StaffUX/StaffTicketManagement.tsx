@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {  QrCodeModalScan } from '../../components/QrCodeModalScan';
 import TicketNotActivatedModal from '../../components/TicketNotActivatedModal';
 import { authAPI } from '../../services/authAPI';
-import { parseTicketIdFromQr, mapTicketDbStatusToUi, type TicketScanAction } from '../../utils/ticketScan';
+import { parseTicketIdFromQr, mapTicketDbStatusToUi, sortTicketsByNumberDesc, type TicketScanAction } from '../../utils/ticketScan';
 
 interface Ticket {
   id: string;
@@ -72,9 +72,9 @@ export default function StaffTicketManagement({ selectedEventId }: { selectedEve
       if (data.success) {
         const currentUserId = user?.id;
 
-        const mapped: Ticket[] = data.tickets
-          .filter((t: any) => t.sold_by === currentUserId || t.scanned_by === currentUserId)
-          .map((t: any) => {
+        const mapped: Ticket[] = sortTicketsByNumberDesc(
+          data.tickets.filter((t: any) => t.sold_by === currentUserId || t.scanned_by === currentUserId)
+        ).map((t: any) => {
             const uiStatus = mapTicketDbStatusToUi(t.status);
 
             const name = t.holder_name || 'Inconnu';

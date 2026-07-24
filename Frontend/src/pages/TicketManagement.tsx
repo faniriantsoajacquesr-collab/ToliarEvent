@@ -12,7 +12,7 @@ import { QrCodeModalScan } from '../components/QrCodeModalScan';
 import TicketNotActivatedModal from '../components/TicketNotActivatedModal';
 import TicketTypesManagement from '../components/TicketTypesManagement';
 import { authAPI } from '../services/authAPI';
-import { parseTicketIdFromQr, mapTicketDbStatusToUi, type TicketScanAction } from '../utils/ticketScan';
+import { parseTicketIdFromQr, mapTicketDbStatusToUi, sortTicketsByNumberDesc, type TicketScanAction } from '../utils/ticketScan';
 
 interface Ticket {
   id: string;
@@ -103,7 +103,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
       const data = await res.json();
 
       if (data.success) {
-        const mapped: Ticket[] = data.tickets.map((t: any) => {
+        const mapped: Ticket[] = sortTicketsByNumberDesc(data.tickets || []).map((t: any) => {
           const uiStatus = mapTicketDbStatusToUi(t.status);
 
           const name = t.holder_name || 'Inconnu';

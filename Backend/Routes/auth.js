@@ -2836,7 +2836,7 @@ router.get('/tickets', async (req, res) => {
             .eq('event_id', event_id)
             .in('id', matchingIds);
 
-          const { data: tickets, error: ticketsError } = await query.order('created_at', { ascending: false });
+          const { data: tickets, error: ticketsError } = await query.order('number', { ascending: false, nullsFirst: false });
           if (ticketsError) return res.status(400).json({ success: false, error: ticketsError.message });
           return res.json({ success: true, tickets });
         } catch (searchError) {
@@ -2859,7 +2859,7 @@ router.get('/tickets', async (req, res) => {
       query = query.eq('ticket_type', ticket_type);
     }
 
-    const { data: tickets, error: ticketsError } = await query.order('created_at', { ascending: false });
+    const { data: tickets, error: ticketsError } = await query.order('number', { ascending: false, nullsFirst: false });
 
     if (ticketsError) return res.status(400).json({ success: false, error: ticketsError.message });
 
