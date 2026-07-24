@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from '../config/api';
+import { normalizeTicketDbStatus } from '../utils/ticketScan';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 
@@ -43,7 +44,7 @@ export default function EditTicketModal({ isOpen, onClose, ticketId, eventId, on
               holder_name: ticket.holder_name || '',
               ticket_type: ticket.ticket_type || 'standard',
               price: ticket.price || 0,
-              status: (ticket.status === 'valide' ? 'valid' : ticket.status) || 'valid',
+              status: normalizeTicketDbStatus(ticket.status),
             });
           } else {
             showToast(data.error || 'Billet introuvable pour édition.', 'error');
@@ -124,7 +125,7 @@ export default function EditTicketModal({ isOpen, onClose, ticketId, eventId, on
               <select name="status" id="status" value={formData.status} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
                 <option value="valid">Valide</option>
                 <option value="vendu">Vendu</option>
-                <option value="utilisé">Utilisé</option>
+                <option value="utilise">Utilisé</option>
               </select>
             </div>
             <div className="flex justify-end gap-3 mt-6">

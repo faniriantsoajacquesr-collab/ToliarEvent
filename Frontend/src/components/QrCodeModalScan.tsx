@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import type { TicketScanAction } from '../utils/ticketScan';
+import { mapTicketDbStatusToUi, normalizeTicketDbStatus } from '../utils/ticketScan';
 
 interface QrCodeModalProps {
   isOpen: boolean;
@@ -8,8 +10,20 @@ interface QrCodeModalProps {
   ticketId?: string; // Requis pour le mode "display"
   ticketStatus?: string; // Optionnel : pour afficher l'état actuel (vendu, réservé...)
   mode?: 'display' | 'scan'; // Permet de choisir le comportement
+  scanAction?: TicketScanAction;
   onScanSuccess?: (scannedId: string) => void; // Callback quand un QR code est détecté
 }
+
+const SCAN_COPY: Record<TicketScanAction, { title: string; helper: string }> = {
+  activate: {
+    title: 'Activer un billet',
+    helper: 'Scannez le QR code pour marquer le billet comme vendu après paiement.',
+  },
+  use: {
+    title: 'Scanner un billet',
+    helper: 'Scannez le QR code pour valider l\'entrée et marquer le billet comme utilisé.',
+  },
+};
 
 export const QrCodeModalScan: React.FC<QrCodeModalProps> = ({
   isOpen,
@@ -17,6 +31,7 @@ export const QrCodeModalScan: React.FC<QrCodeModalProps> = ({
   ticketId,
   ticketStatus,
   mode = 'display',
+  scanAction = 'use',
   onScanSuccess,
 }) => {
   
@@ -61,7 +76,7 @@ export const QrCodeModalScan: React.FC<QrCodeModalProps> = ({
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50">
           <h3 className="text-lg font-bold text-gray-900">
-            {mode === 'display' ? 'Ticket QR Code' : 'Scanner un Billet'}
+            {mode === 'display' ? 'Ticket QR Code' : SCAN_COPY[scanAction].title}
           </h3>
           <button
             onClick={onClose}
@@ -89,9 +104,13 @@ export const QrCodeModalScan: React.FC<QrCodeModalProps> = ({
                 <p className="text-xs text-gray-400 font-mono select-all">ID: {ticketId}</p>
                 {ticketStatus && (
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase ${
-                    ticketStatus === 'vendu' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                    normalizeTicketDbStatus(ticketStatus) === 'vendu'
+                      ? 'bg-amber-100 text-amber-700'
+                      : normalizeTicketDbStatus(ticketStatus) === 'utilise'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-green-100 text-green-700'
                   }`}>
-                    {ticketStatus}
+                    {mapTicketDbStatusToUi(ticketStatus)}
                   </span>
                 )}
               </div>
@@ -100,7 +119,7 @@ export const QrCodeModalScan: React.FC<QrCodeModalProps> = ({
             /* --- MODE SCANNER VIA CAMÉRA --- */
             <div className="w-full text-center">
               <p className="text-sm text-gray-500 mb-4">
-                Placez le QR Code du billet devant votre caméra pour le valider instantanément.
+                {SCAN_COPY[scanAction].helper}
               </p>
               <div 
                 id="qr-reader-container" 

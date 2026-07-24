@@ -629,6 +629,23 @@ export const authAPI = {
     return response.json();
   },
 
+  async scanTicket(
+    ticketId: string,
+    eventId: string,
+    action: 'activate' | 'use',
+    accessToken: string
+  ) {
+    const response = await fetch(`${API_URL}/tickets/scan`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ticket_id: ticketId, event_id: eventId, action }),
+    });
+    return response.json();
+  },
+
   async bulkEventStaffAction(
     applicationIds: number[],
     action: 'accept' | 'reject' | 'delete',

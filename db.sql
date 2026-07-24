@@ -113,10 +113,12 @@ CREATE TABLE IF NOT EXISTS public.tickets (
   scanned_by uuid,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  number smallint,
   CONSTRAINT tickets_pkey PRIMARY KEY (id),
   CONSTRAINT tickets_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id),
   CONSTRAINT tickets_sold_by_fkey FOREIGN KEY (sold_by) REFERENCES public.profiles(id),
-  CONSTRAINT tickets_scanned_by_fkey FOREIGN KEY (scanned_by) REFERENCES public.profiles(id)
+  CONSTRAINT tickets_scanned_by_fkey FOREIGN KEY (scanned_by) REFERENCES public.profiles(id),
+  CONSTRAINT tickets_status_check CHECK (status = ANY (ARRAY['valid'::text, 'vendu'::text, 'utilise'::text]))
 );
 
 -- Table des catégories de transactions (dépend de organizations)

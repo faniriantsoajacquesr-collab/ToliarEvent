@@ -9,8 +9,10 @@ import { useAuth } from '../contexts/AuthContext';
 import EditTicketModal from '../components/EditTicketModal';
 import QrCodeModal from '../components/QrCodeModal';
 import { QrCodeModalScan } from '../components/QrCodeModalScan';
+import TicketNotActivatedModal from '../components/TicketNotActivatedModal';
 import TicketTypesManagement from '../components/TicketTypesManagement';
 import { authAPI } from '../services/authAPI';
+import { parseTicketIdFromQr, mapTicketDbStatusToUi, type TicketScanAction } from '../utils/ticketScan';
 
 interface Ticket {
   id: string;
@@ -41,6 +43,8 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [qrTicketId, setQrTicketId] = useState<string | null>(null);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [scanAction, setScanAction] = useState<TicketScanAction>('use');
+  const [isNotActivatedModalOpen, setIsNotActivatedModalOpen] = useState(false);
   const [isScanProcessing, setIsScanProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -100,10 +104,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
 
       if (data.success) {
         const mapped: Ticket[] = data.tickets.map((t: any) => {
-          let uiStatus: 'Valide' | 'Payé' | 'Utilisé' = 'Valide';
-          if (t.status === 'vendu') uiStatus = 'Payé';
-          else if (t.status === 'utilisé') uiStatus = 'Utilisé';
-          else if (t.status === 'valide' || t.status === 'valid') uiStatus = 'Valide';
+          const uiStatus = mapTicketDbStatusToUi(t.status);
 
           const name = t.holder_name || 'Inconnu';
           const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
@@ -259,63 +260,47 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
     setIsQrModalOpen(true);
   };
 
-  const handleOpenScanner = () => {
+  const handleOpenScanner = (action: TicketScanAction) => {
     if (!selectedEventId) {
       showToast("Sélectionnez d'abord un événement avant de scanner.", 'error');
       return;
     }
+    setScanAction(action);
     setIsScanModalOpen(true);
   };
 
   const handleScanSuccess = async (decodedText: string) => {
-    let ticketId = decodedText || '';
-    try {
-      const u = new URL(decodedText);
-      const parts = u.pathname.split('/').filter(Boolean);
-      if (parts.length > 0) ticketId = parts[parts.length - 1];
-    } catch {
-      // not a URL, keep decodedText as-is
-    }
+    const ticketId = parseTicketIdFromQr(decodedText);
 
     if (!ticketId) {
       showToast('QR invalide : aucun ID détecté', 'error');
       return;
     }
 
-    if (!session?.access_token) {
+    if (!session?.access_token || !selectedEventId) {
       showToast('Vous devez être connecté pour valider un billet', 'error');
       return;
     }
 
     try {
       setIsScanProcessing(true);
-      const res = await fetch(`${API_URL}/tickets/scan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ ticket_id: ticketId, event_id: selectedEventId }),
-      });
+      const data = await authAPI.scanTicket(ticketId, selectedEventId, scanAction, session.access_token);
 
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        const text = await res.text();
-        console.error('Non-JSON response from /tickets/scan:', text);
-        showToast('Erreur serveur : réponse inattendue.', 'error');
+      if (data.success) {
+        showToast(data.message || (scanAction === 'activate' ? 'Billet activé' : 'Billet validé'), 'success');
+        await fetchTickets(true);
         return;
       }
 
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message || 'Billet validé', 'success');
-        await fetchTickets(true);
-      } else {
-        showToast(data.error || data.message || 'Échec de la validation', 'error');
+      if (scanAction === 'use' && data.error_code === 'NOT_ACTIVATED') {
+        setIsNotActivatedModalOpen(true);
+        return;
       }
+
+      showToast(data.error || data.message || 'Échec du traitement', 'error');
     } catch (err) {
       console.error('Scan API error:', err);
-      showToast('Erreur réseau lors de la validation', 'error');
+      showToast('Erreur réseau lors du traitement', 'error');
     } finally {
       setIsScanProcessing(false);
     }
@@ -360,7 +345,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
               <h3 className="text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
                 Actions de Billetterie
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   className="w-full flex items-center justify-center gap-3 bg-primary text-white px-4 py-4 rounded-xl shadow-sm hover:bg-primary/95 active:scale-[0.99] transition-all group overflow-hidden relative"
                   onClick={() => {
@@ -378,12 +363,23 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
                   </div>
                 </button>
                 <button
+                  className="w-full flex items-center justify-center gap-3 bg-secondary text-white px-4 py-4 rounded-xl shadow-md hover:bg-secondary/95 active:scale-[0.99] transition-all"
+                  onClick={() => handleOpenScanner('activate')}
+                >
+                  <span className="material-symbols-outlined text-xl">point_of_sale</span>
+                  <div className="text-left">
+                    <span className="block text-sm font-bold">Activer un billet</span>
+                    <span className="block text-[11px] opacity-80">Marquer comme vendu</span>
+                  </div>
+                </button>
+                <button
                   className="w-full flex items-center justify-center gap-3 bg-tertiary text-white px-4 py-4 rounded-xl shadow-md hover:bg-tertiary/95 active:scale-[0.99] transition-all"
-                  onClick={handleOpenScanner}
+                  onClick={() => handleOpenScanner('use')}
                 >
                   <span className="material-symbols-outlined text-xl">qr_code_scanner</span>
                   <div className="text-left">
                     <span className="block text-sm font-bold">Scanner un billet</span>
+                    <span className="block text-[11px] opacity-80">Valider l&apos;entrée</span>
                   </div>
                 </button>
               </div>
@@ -551,7 +547,13 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
         isOpen={isScanModalOpen}
         onClose={() => setIsScanModalOpen(false)}
         mode="scan"
+        scanAction={scanAction}
         onScanSuccess={handleScanSuccess}
+      />
+
+      <TicketNotActivatedModal
+        isOpen={isNotActivatedModalOpen}
+        onClose={() => setIsNotActivatedModalOpen(false)}
       />
     </>
   );

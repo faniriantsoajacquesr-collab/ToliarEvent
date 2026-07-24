@@ -3033,16 +3033,20 @@ router.post('/tickets/bulk-update-status', async (req, res) => {
 
 /**
  * POST /api/auth/tickets/scan
- * Body: { ticket_id: string, event_id?: string }
- * valide → vendu, vendu → utilisé (admin org ou staff validé)
+ * Body: { ticket_id: string, event_id?: string, action: 'activate' | 'use' }
+ * - activate : valid → vendu
+ * - use      : vendu → utilise (refus si non activé)
  */
 router.post('/tickets/scan', async (req, res) => {
   try {
     const access_token = req.headers.authorization?.split('Bearer ')[1];
-    const { ticket_id, event_id } = req.body;
+    const { ticket_id, event_id, action = 'use' } = req.body;
 
     if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
     if (!ticket_id) return res.status(400).json({ success: false, error: 'ticket_id requis' });
+    if (action !== 'activate' && action !== 'use') {
+      return res.status(400).json({ success: false, error: "action invalide (attendu: 'activate' ou 'use')" });
+    }
 
     const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
     if (authError || !authData.user) {
@@ -3084,7 +3088,10 @@ router.post('/tickets/scan', async (req, res) => {
       });
     }
 
-    const statusNorm = String(ticket.status || '').toLowerCase();
+    const statusNorm = String(ticket.status || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const now = new Date().toISOString();
+    const holderLabel = ticket.holder_name || 'Participant';
+
     if (SCANNED_STATUSES.has(statusNorm)) {
       return res.status(409).json({
         success: false,
@@ -3093,21 +3100,37 @@ router.post('/tickets/scan', async (req, res) => {
       });
     }
 
-    const now = new Date().toISOString();
     let updatePayload;
     let successMessage;
 
-    if (VALID_STATUSES.has(statusNorm)) {
+    if (action === 'activate') {
+      if (SOLD_STATUSES.has(statusNorm)) {
+        return res.json({
+          success: true,
+          message: 'Ce billet est déjà activé (vendu).',
+          ticket,
+          already_done: true,
+        });
+      }
+      if (!VALID_STATUSES.has(statusNorm)) {
+        return res.status(400).json({
+          success: false,
+          error: `Ce billet ne peut pas être activé (statut actuel : ${ticket.status || 'inconnu'}).`,
+        });
+      }
       updatePayload = { status: 'vendu', sold_by: authData.user.id, updated_at: now };
-      successMessage = `Billet marqué comme vendu pour ${ticket.holder_name || 'Participant'}.`;
-    } else if (SOLD_STATUSES.has(statusNorm)) {
-      updatePayload = { status: 'utilisé', scanned_by: authData.user.id, updated_at: now };
-      successMessage = `Billet validé à l'entrée pour ${ticket.holder_name || 'Participant'}.`;
+      successMessage = `Billet activé et marqué comme vendu pour ${holderLabel}.`;
     } else {
-      return res.status(400).json({
-        success: false,
-        error: `Ce billet ne peut pas être scanné (statut actuel : ${ticket.status || 'inconnu'}).`,
-      });
+      if (!SOLD_STATUSES.has(statusNorm)) {
+        return res.status(409).json({
+          success: false,
+          error_code: 'NOT_ACTIVATED',
+          error: "Ce billet n'est pas encore activé et n'a donc pas été payé.",
+          ticket_status: ticket.status,
+        });
+      }
+      updatePayload = { status: 'utilise', scanned_by: authData.user.id, updated_at: now };
+      successMessage = `Billet validé à l'entrée pour ${holderLabel}.`;
     }
 
     const { data: updated, error: updateError } = await dbAdmin
