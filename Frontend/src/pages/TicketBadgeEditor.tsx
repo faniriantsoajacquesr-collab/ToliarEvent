@@ -609,7 +609,7 @@ export default function TicketBadgeEditor() {
       qrLayoutMode: mode,
       activeTab: 'single',
       ...defaults,
-      qrContainerMm: mode === 'margin' ? (defaults.qrContainerMm ?? c.qrContainerMm) : 0,
+      qrContainerMm: mode === 'margin' ? (getMarginDefaults(config.supportType).qrContainerMm ?? c.qrContainerMm) : 0,
     }));
   };
 

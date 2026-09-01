@@ -357,7 +357,12 @@ export default function EventManager({ onSelectEvent }: EventManagerProps) {
         onClose={() => setIsDetailsOpen(false)}
         event={
           viewingEvent
-            ? { ...viewingEvent, description: viewingEvent.description ?? '' }
+            ? {
+                ...viewingEvent,
+                description: viewingEvent.description ?? '',
+                rawStartDate: viewingEvent.rawStartDate ?? viewingEvent.startDate,
+                rawEndDate: viewingEvent.rawEndDate ?? viewingEvent.endDate,
+              }
             : null
         }
       />

@@ -2,6 +2,16 @@ import jsQR from 'jsqr';
 import Tesseract from 'tesseract.js';
 import { parseTicketIdFromQr } from './ticketScan';
 
+async function recognizeCanvas(canvas: HTMLCanvasElement, lang: string, psm: Tesseract.PSM) {
+  const worker = await Tesseract.createWorker(lang);
+  try {
+    await worker.setParameters({ tessedit_pageseg_mode: psm });
+    return worker.recognize(canvas);
+  } finally {
+    await worker.terminate();
+  }
+}
+
 export type ParsedTicketFromScreenshot = {
   id: string;
   number: number | null;
@@ -331,11 +341,11 @@ async function recognizeLabelParsed(
   canvas: HTMLCanvasElement
 ): Promise<{ number: number | null; ticket_type: string }> {
   const { topCrop, numberCrop } = splitLabelCrops(canvas);
-  const attempts: Array<{ canvas: HTMLCanvasElement; lang: string; psm: string; preferNumber?: boolean }> = [
-    { canvas: enhanceForOcr(numberCrop, 'hard'), lang: 'eng+fra', psm: '7', preferNumber: true },
-    { canvas: enhanceForOcr(topCrop, 'hard'), lang: 'eng+fra', psm: '7' },
-    { canvas: enhanceForOcr(topCrop, 'soft'), lang: 'eng+fra', psm: '7' },
-    { canvas: enhanceForOcr(canvas, 'soft'), lang: 'eng+fra', psm: '6' },
+  const attempts: Array<{ canvas: HTMLCanvasElement; lang: string; psm: Tesseract.PSM; preferNumber?: boolean }> = [
+    { canvas: enhanceForOcr(numberCrop, 'hard'), lang: 'eng+fra', psm: Tesseract.PSM.SINGLE_LINE, preferNumber: true },
+    { canvas: enhanceForOcr(topCrop, 'hard'), lang: 'eng+fra', psm: Tesseract.PSM.SINGLE_LINE },
+    { canvas: enhanceForOcr(topCrop, 'soft'), lang: 'eng+fra', psm: Tesseract.PSM.SINGLE_LINE },
+    { canvas: enhanceForOcr(canvas, 'soft'), lang: 'eng+fra', psm: Tesseract.PSM.SINGLE_BLOCK },
   ];
 
   let bestNumber: number | null = null;
@@ -344,10 +354,7 @@ async function recognizeLabelParsed(
   let bestTypeScore = -1;
 
   for (const attempt of attempts) {
-    const { data } = await Tesseract.recognize(attempt.canvas, attempt.lang, {
-      logger: () => undefined,
-      tessedit_pageseg_mode: attempt.psm,
-    });
+    const { data } = await recognizeCanvas(attempt.canvas, attempt.lang, attempt.psm);
     const text = data.text || '';
     const parsed = parseTicketLabel(text);
     const score = scoreParsedLabel(parsed, text);
@@ -459,10 +466,7 @@ function extractLabelsFromPlainText(text: string): Array<{ number: number; ticke
 }
 
 async function extractLabelCandidates(canvas: HTMLCanvasElement): Promise<LabelCandidate[]> {
-  const { data } = await Tesseract.recognize(enhanceForOcr(canvas, 'soft'), 'eng+fra', {
-    logger: () => undefined,
-    tessedit_pageseg_mode: '6',
-  });
+  const { data } = await recognizeCanvas(enhanceForOcr(canvas, 'soft'), 'eng+fra', Tesseract.PSM.SINGLE_BLOCK);
 
   const plainLabels = extractLabelsFromPlainText(data.text || '');
   return plainLabels.map((label, index) => ({
