@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+
+Disallow: /events
+Disallow: /staff
+Disallow: /tickets
+Disallow: /commandes
+Disallow: /planning
+Disallow: /finance
+Disallow: /publication
+Disallow: /publication-builder
+Disallow: /dashboard
+Disallow: /complete-profile
+Disallow: /organization-choice
+Disallow: /organization-pending
+Disallow: /auth/
+
+Sitemap: https://toliarevent.vercel.app/sitemap.xml
