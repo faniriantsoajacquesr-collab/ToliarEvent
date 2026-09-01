@@ -1,11 +1,29 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { API_URL } from '../config/api';
 import { authAPI } from '../services/authAPI';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Image as IconImage, RefreshCw, Layout, Edit, Sliders, AlertTriangle, Maximize2, Hash, Mail, Check, Download } from 'lucide-react';
+import QrInteractivePreview from '../components/badge/QrInteractivePreview';
+import TicketMarginStrip from '../components/badge/TicketMarginStrip';
+import {
+  getQrZoneWidthMm,
+  computeRowHeightMm,
+  getEmbeddedDefaults,
+  getMarginDefaults,
+  capTicketWidthMm,
+  getMarginLayoutMm,
+  getMarginQrPosZoneMm,
+  MARGIN_LABEL_COL_MM,
+  normalizeHexColor,
+  getContrastTextColor,
+  type QrLayoutMode,
+} from '../utils/badgeQrLayout';
+import AppPageHeader from '../components/AppPageHeader';
+import { serializeGenerationConfig } from '../utils/serializeGenerationConfig';
+import { TicketLabelColumn } from '../components/badge/TicketLabelColumn';
+import { Image as IconImage, RefreshCw, Layout, Edit, Sliders, AlertTriangle, Maximize2, Hash, Check, Download } from 'lucide-react';
 
-type SupportType = 'ticket' | 'badge' | 'invitation';
+type SupportType = 'invitation' | 'badge';
 type LayoutOption = '1_col' | '2_col' | '3_col' | 'custom';
 
 type Config = {
@@ -14,8 +32,13 @@ type Config = {
   layoutOption: LayoutOption;
   customDimensions: { width: number; height: number }; // mm
   qrPosition: 'front' | 'back';
-  qrBg: 'white' | 'black';
-  qrContainerMm?: number; // largeur du container QR en mm
+  qrBg: string;
+  qrFg: string;
+  qrContainerMm?: number; // largeur du container QR en mm (mode marge)
+  qrLayoutMode: QrLayoutMode;
+  qrSizeMm: number;
+  qrPosX: number;
+  qrPosY: number;
   backgroundImage?: string | null;
   backgroundFile?: File | null;
   eventId?: string | null;
@@ -48,9 +71,14 @@ export default function TicketBadgeEditor() {
     backgroundFile: null,
     backgroundColor: '#ffffff',
     backText: 'Règlement: présentation obligatoire à l’entrée.',
-    activeTab: 'sheet',
-    qrBg: 'white',
+    activeTab: 'single',
+    qrBg: '#0a0a0a',
+    qrFg: '#000000',
     qrContainerMm: 50,
+    qrLayoutMode: 'margin',
+    qrSizeMm: 40,
+    qrPosX: 50,
+    qrPosY: 50,
     rowGap: 4, 
     colGap: 4,
   });
@@ -127,6 +155,84 @@ export default function TicketBadgeEditor() {
     }
   }
 
+  const getEffectiveDimensionsMm = (targetCols: number, supportType: SupportType, naturalSize: { width: number; height: number } | null) => {
+    if (supportType === 'badge') {
+      return { widthMm: 85, heightMm: 54, designWidthMm: 85 };
+    }
+
+    const qrContainerMm = config.qrLayoutMode === 'margin' ? (config.qrContainerMm || 50) : 0;
+
+    if (manualDimsEnabled) {
+      let heightMm = config.customDimensions.height || DEFAULT_HEIGHT;
+
+      if (config.qrLayoutMode === 'margin') {
+        const designWidthMm = config.customDimensions.width || DEFAULT_WIDTH;
+        if (naturalSize) {
+          heightMm = computeRowHeightMm(designWidthMm, naturalSize, heightMm);
+        }
+        const marginLayout = getMarginLayoutMm({
+          designWidthMm,
+          rowHeightMm: heightMm,
+          qrContainerMm,
+          cols: targetCols,
+          colGapMm: config.colGap,
+          imgNatural: naturalSize,
+        });
+        return {
+          widthMm: marginLayout.totalWidthMm,
+          heightMm: Math.round(heightMm),
+          designWidthMm: marginLayout.designDisplayMm,
+        };
+      }
+
+      if (config.qrLayoutMode === 'embedded') {
+        const designWidthMm = config.customDimensions.width || DEFAULT_WIDTH;
+        if (naturalSize) {
+          heightMm = computeRowHeightMm(designWidthMm, naturalSize, heightMm);
+        }
+        const cappedTotal = capTicketWidthMm(designWidthMm + MARGIN_LABEL_COL_MM, targetCols, config.colGap);
+        const designW = Math.max(10, cappedTotal - MARGIN_LABEL_COL_MM);
+        return {
+          widthMm: designW + MARGIN_LABEL_COL_MM,
+          heightMm: Math.round(heightMm),
+          designWidthMm: designW,
+        };
+      }
+
+      const maxColW = capTicketWidthMm(config.customDimensions.width, targetCols, config.colGap);
+      if (naturalSize) {
+        heightMm = computeRowHeightMm(maxColW, naturalSize, heightMm);
+      }
+      return { widthMm: Math.round(maxColW), heightMm: Math.round(heightMm), designWidthMm: Math.round(maxColW) };
+    }
+
+    const auto = getLiveDimensionsMm(targetCols, supportType, naturalSize);
+    if (config.qrLayoutMode === 'margin' && naturalSize) {
+      const marginLayout = getMarginLayoutMm({
+        designWidthMm: auto.widthMm - qrContainerMm,
+        rowHeightMm: auto.heightMm,
+        qrContainerMm,
+        cols: targetCols,
+        colGapMm: config.colGap,
+        imgNatural: naturalSize,
+      });
+      return {
+        widthMm: marginLayout.totalWidthMm,
+        heightMm: auto.heightMm,
+        designWidthMm: marginLayout.designDisplayMm,
+      };
+    }
+    if (config.qrLayoutMode === 'embedded') {
+      const designW = Math.max(10, auto.widthMm - MARGIN_LABEL_COL_MM);
+      return {
+        widthMm: designW + MARGIN_LABEL_COL_MM,
+        heightMm: auto.heightMm,
+        designWidthMm: designW,
+      };
+    }
+    return { ...auto, designWidthMm: auto.widthMm };
+  };
+
   // Calcul des dimensions réelles en mm pour la règle de 3
   const getLiveDimensionsMm = (targetCols: number, supportType: SupportType, naturalSize: { width: number; height: number } | null) => {
     if (supportType === 'badge') {
@@ -140,17 +246,16 @@ export default function TicketBadgeEditor() {
     let rowHeightPx = colWidthPx * (54 / 85);
     
     if (naturalSize) {
-      if (supportType === 'invitation') {
-        // Le QR Code fait STRICTEMENT 50mm de large. L'image prend le reste de la colonne.
-        const qrWidthPx = (config.qrContainerMm || 50) * MM_TO_PX;
-        const imageWidthPx = Math.max(30, colWidthPx - qrWidthPx);
-        const imageRatio = naturalSize.width / naturalSize.height;
-        // La hauteur de la ligne dépend exclusivement de la mise à l'échelle de l'image
-        rowHeightPx = imageWidthPx / imageRatio;
-      } else {
-        const imageRatio = naturalSize.width / naturalSize.height;
-        rowHeightPx = colWidthPx / (imageRatio + 1);
+      if (config.qrLayoutMode === 'embedded') {
+        const totalWidthMm = Math.round((colWidthPx * 210) / SHEET_PREVIEW_WIDTH_PX);
+        const designWidthMm = Math.max(10, totalWidthMm - MARGIN_LABEL_COL_MM);
+        const heightMm = computeRowHeightMm(designWidthMm, naturalSize);
+        return { widthMm: designWidthMm + MARGIN_LABEL_COL_MM, heightMm, designWidthMm };
       }
+      const qrWidthPx = (config.qrContainerMm || 50) * MM_TO_PX;
+      const imageWidthPx = Math.max(30, colWidthPx - qrWidthPx);
+      const imageRatio = naturalSize.width / naturalSize.height;
+      rowHeightPx = imageWidthPx / imageRatio;
     }
 
     const widthMm = Math.round((colWidthPx * 210) / SHEET_PREVIEW_WIDTH_PX);
@@ -164,46 +269,29 @@ export default function TicketBadgeEditor() {
   };
 
   // Strict/predictive total count using the exact rendered ticket height
-  const getLiveTotalCount = (targetCols: number, supportType: SupportType, naturalSize: { width: number; height: number } | null) => {
+  const getLiveTotalCount = (
+    targetCols: number,
+    supportType: SupportType,
+    naturalSize: { width: number; height: number } | null,
+    effectiveDims: { widthMm: number; heightMm: number; designWidthMm?: number }
+  ) => {
     const isBadge = supportType === 'badge';
-    const AVAILABLE_WIDTH_PX = SHEET_PREVIEW_WIDTH_PX - 32;
     const AVAILABLE_HEIGHT_PX = SHEET_PREVIEW_HEIGHT_PX - 32;
 
     const rGapPx = config.rowGap * MM_TO_PX;
-    const cGapPx = config.colGap * MM_TO_PX;
 
-    const colWidthPx = (AVAILABLE_WIDTH_PX - (cGapPx * (targetCols - 1))) / targetCols;
+    let rowHeightPx = effectiveDims.widthMm * MM_TO_PX * (54 / 85);
 
-    let rowHeightPx = colWidthPx * (54 / 85);
-
-    if (manualDimsEnabled) {
-      // FIX STRICT : Si le mode manuel est activé, la hauteur d'une ligne est définie 
-      // soit directement par la dimension voulue, soit recalculée si un ratio image prend le dessus.
-      const manualTotalColPx = config.customDimensions.width * MM_TO_PX;
-      const maxPerCol = (AVAILABLE_WIDTH_PX - (cGapPx * (targetCols - 1))) / targetCols;
-      const totalColPx = Math.min(manualTotalColPx, maxPerCol);
-      
-      const qrContainerPx = (config.qrContainerMm || 50) * MM_TO_PX;
-      const imageWidthPx = Math.max(0, totalColPx - qrContainerPx);
-
-      if (naturalSize) {
-        rowHeightPx = imageWidthPx / (naturalSize.width / naturalSize.height);
-      } else {
-        rowHeightPx = config.customDimensions.height * MM_TO_PX_HEIGHT;
-      }
-    } else if (!isBadge && naturalSize) {
-      if (supportType === 'invitation') {
-        const qrWidthPx = (config.qrContainerMm || 50) * MM_TO_PX;
-        const imageWidthPx = Math.max(30, colWidthPx - qrWidthPx);
-        rowHeightPx = imageWidthPx / (naturalSize.width / naturalSize.height);
-      } else {
-        const imageWidthPx = colWidthPx / 2;
-        rowHeightPx = imageWidthPx / (naturalSize.width / naturalSize.height);
-      }
+    if (naturalSize && !isBadge) {
+      const designWidthMm = effectiveDims.designWidthMm ?? effectiveDims.widthMm;
+      rowHeightPx = (designWidthMm * MM_TO_PX) / (naturalSize.width / naturalSize.height);
+    } else {
+      rowHeightPx = effectiveDims.heightMm * MM_TO_PX_HEIGHT;
     }
 
-    // On s'assure que la hauteur finale testée est STRICTEMENT identique à celle envoyée au style CSS
-    const renderedTicketHeight = rowHeightPx;
+    const renderedTicketHeight = manualDimsEnabled
+      ? Math.max(rowHeightPx, (config.customDimensions.height || DEFAULT_HEIGHT) * MM_TO_PX_HEIGHT)
+      : rowHeightPx;
 
     // Simulation précise ligne par ligne pour exclure les débordements
     let y = 0;
@@ -273,14 +361,14 @@ export default function TicketBadgeEditor() {
   };
 
   const handleSupportTypeChange = (type: SupportType) => {
-    const targetCols = type === 'ticket' ? 2 : type === 'invitation' ? 1 : 3;
-    const targetPosition = type === 'ticket' || type === 'invitation' ? 'front' : 'back';
+    const targetCols = type === 'invitation' ? 1 : 3;
+    const targetPosition = type === 'invitation' ? 'front' : 'back';
     checkHeightAndExecute(targetCols, type, imgNatural, () => {
-      setConfig(c => ({ 
-        ...c, 
-        supportType: type, 
-        layoutOption: type === 'ticket' ? '2_col' : type === 'invitation' ? '1_col' : '3_col', 
-        qrPosition: targetPosition 
+      setConfig(c => ({
+        ...c,
+        supportType: type,
+        layoutOption: type === 'invitation' ? '1_col' : '3_col',
+        qrPosition: targetPosition,
       }));
     });
   };
@@ -303,11 +391,9 @@ export default function TicketBadgeEditor() {
 
   const sheetCols = config.layoutOption === '1_col' ? 1 : config.layoutOption === '2_col' ? 2 : 3;
 
-  // Calcul des dimensions actuelles pour la précision du rendu backend
-  const currentDims = manualDimsEnabled
-    ? { widthMm: config.customDimensions.width, heightMm: config.customDimensions.height }
-    : getLiveDimensionsMm(sheetCols, config.supportType, imgNatural);
-  const layoutStats = getLiveTotalCount(sheetCols, config.supportType, imgNatural);
+  // Dimensions effectives (aperçu + PDF) — plafonnées à la largeur A4
+  const currentDims = getEffectiveDimensionsMm(sheetCols, config.supportType, imgNatural);
+  const layoutStats = getLiveTotalCount(sheetCols, config.supportType, imgNatural, currentDims);
   const totalTicketsCount = layoutStats.total;
 
   const appendLog = (line: string) => setGenLog(l => [...l, line]);
@@ -380,13 +466,13 @@ export default function TicketBadgeEditor() {
         event_id: selectedEventForGen, 
         count: ticketCount, 
         ticket_type: ticketType, 
-        price: ticketPrice, // Include ticket price in the payload
+        price: ticketPrice,
         design_image_data: imageData,
-        config: {
-          ...config,
+        config: serializeGenerationConfig(config, {
           widthMm: currentDims.widthMm,
-          heightMm: currentDims.heightMm
-        } 
+          heightMm: currentDims.heightMm,
+          designWidthMm: currentDims.designWidthMm,
+        }),
       };
 
       const res = await fetch(`${API_URL}/generate-tickets`, {
@@ -456,334 +542,350 @@ export default function TicketBadgeEditor() {
   };
 
   const getIdealDimensionsText = () => {
-    if (config.supportType === 'ticket') {
-      const AVAILABLE_A4_WIDTH_MM = 210 - 10; 
-      const colWidthMm = Math.round((AVAILABLE_A4_WIDTH_MM - (config.colGap * (sheetCols - 1))) / sheetCols);
-      return `Format Ticket Entry : Pour une impression en ${sheetCols} colonne(s), privilégiez un design d'au moins 4.0 cm de hauteur (Idéal : ${colWidthMm - 40}x40 mm).`;
-    } else if (config.supportType === 'invitation') {
-      return `Format Invitation : Le conteneur QR est bridé à 5 cm max. Votre visuel Canva est mis à l'échelle automatiquement sur la largeur restante de la ligne A4.`;
-    } else {
-      return `Format Badge Pro standard : exportez votre fichier sous les dimensions de 85x54 mm (Rendu net à 300 DPI).`;
+    if (config.qrLayoutMode === 'embedded') {
+      return `Mode incrusté : QR sur le visuel + bande latérale colorée avec libellés verticaux.`;
     }
+    if (config.supportType === 'invitation') {
+      return `Format Ticket/Invitation : le conteneur QR est configurable. Votre visuel Canva est mis à l'échelle sur la largeur restante de la ligne A4.`;
+    }
+    return `Format Badge Pro standard : exportez votre fichier sous les dimensions de 85x54 mm (Rendu net à 300 DPI).`;
   };
 
   const onManualWidthChange = (cmValue: number) => {
-    // cmValue is total width in cm (user-facing). Internally use mm.
-    const newTotalWidthMm = Math.round(cmValue * 10);
-    // Enforce imageWidth = qrWidth = totalWidth / 2
-    const imageWidthMm = Math.round(newTotalWidthMm / 2);
+    const newDesignWidthMm = Math.round(cmValue * 10);
     let newHeightMm = config.customDimensions.height || Math.round(DEFAULT_HEIGHT);
+
+    if (config.qrLayoutMode === 'margin' || config.qrLayoutMode === 'embedded') {
+      if (imgNatural) {
+        newHeightMm = Math.round(newDesignWidthMm * (imgNatural.height / imgNatural.width));
+      }
+      setConfig(c => ({ ...c, customDimensions: { width: newDesignWidthMm, height: newHeightMm } }));
+      return;
+    }
+
+    let newTotalWidthMm = newDesignWidthMm;
     if (imgNatural) {
-      // imageHeight = imageWidth / (w/h) => imageWidth * (h/w)
-      newHeightMm = Math.round(imageWidthMm * (imgNatural.height / imgNatural.width));
+      newHeightMm = Math.round(newTotalWidthMm * (imgNatural.height / imgNatural.width));
     } else if (config.customDimensions.width) {
-      const prevImageWidth = Math.round((config.customDimensions.width || DEFAULT_WIDTH) / 2);
-      const prevRatio = (config.customDimensions.height || DEFAULT_HEIGHT) / Math.max(1, prevImageWidth);
-      newHeightMm = Math.round(imageWidthMm * prevRatio);
+      const prevRatio = (config.customDimensions.height || DEFAULT_HEIGHT) / Math.max(1, config.customDimensions.width);
+      newHeightMm = Math.round(newTotalWidthMm * prevRatio);
     }
     setConfig(c => ({ ...c, customDimensions: { width: newTotalWidthMm, height: newHeightMm } }));
   };
 
   const onManualHeightChange = (cmValue: number) => {
-    const newTotalHeightMm = Math.round(cmValue * 10);
-    // imageHeight = totalHeight (row height). imageWidth = imageHeight * (w/h)
-    let imageWidthMm = config.customDimensions.width ? Math.round((config.customDimensions.width || DEFAULT_WIDTH) / 2) : Math.round(DEFAULT_WIDTH / 2);
-    if (imgNatural) {
-      imageWidthMm = Math.round(newTotalHeightMm * (imgNatural.width / imgNatural.height));
-    } else if (config.customDimensions.height) {
-      const prevImageWidth = Math.round((config.customDimensions.width || DEFAULT_WIDTH) / 2);
-      const prevHeight = config.customDimensions.height || DEFAULT_HEIGHT;
-      const approxRatio = prevImageWidth / Math.max(1, prevHeight);
-      imageWidthMm = Math.round(newTotalHeightMm * approxRatio);
+    const newHeightMm = Math.round(cmValue * 10);
+
+    if (config.qrLayoutMode === 'margin' || config.qrLayoutMode === 'embedded') {
+      let designWidthMm = config.customDimensions.width || DEFAULT_WIDTH;
+      if (imgNatural) {
+        designWidthMm = Math.round(newHeightMm * (imgNatural.width / imgNatural.height));
+      } else if (config.customDimensions.height) {
+        const prevDesignW = config.customDimensions.width || DEFAULT_WIDTH;
+        const approxRatio = prevDesignW / Math.max(1, config.customDimensions.height);
+        designWidthMm = Math.round(newHeightMm * approxRatio);
+      }
+      setConfig(c => ({ ...c, customDimensions: { width: designWidthMm, height: newHeightMm } }));
+      return;
     }
-    const newTotalWidthMm = Math.round(imageWidthMm * 2);
-    setConfig(c => ({ ...c, customDimensions: { width: newTotalWidthMm, height: newTotalHeightMm } }));
+
+    let newTotalWidthMm = config.customDimensions.width || DEFAULT_WIDTH;
+    if (imgNatural) {
+      newTotalWidthMm = Math.round(newHeightMm * (imgNatural.width / imgNatural.height));
+    } else if (config.customDimensions.height) {
+      const prevTotalW = config.customDimensions.width || DEFAULT_WIDTH;
+      const approxRatio = prevTotalW / Math.max(1, config.customDimensions.height);
+      newTotalWidthMm = Math.round(newHeightMm * approxRatio);
+    }
+    setConfig(c => ({ ...c, customDimensions: { width: newTotalWidthMm, height: newHeightMm } }));
   };
 
-  const onManualQrSizeChange = (cmValue: number) => {
-    const qrMm = Math.round(cmValue * 10);
-    // Only update qrContainerMm — do not touch customDimensions.width/height here.
-    setConfig(c => ({ ...c, qrContainerMm: qrMm }));
+  const handleQrLayoutModeChange = (mode: QrLayoutMode) => {
+    const defaults = mode === 'embedded'
+      ? getEmbeddedDefaults(config.supportType)
+      : getMarginDefaults(config.supportType);
+    setConfig(c => ({
+      ...c,
+      qrLayoutMode: mode,
+      activeTab: 'single',
+      ...defaults,
+      qrContainerMm: mode === 'margin' ? (defaults.qrContainerMm ?? c.qrContainerMm) : 0,
+    }));
   };
+
+  const patchQrLayout = useCallback((patch: Partial<Pick<Config, 'qrLayoutMode' | 'qrContainerMm' | 'qrSizeMm' | 'qrPosX' | 'qrPosY' | 'qrBg' | 'qrFg'>>) => {
+    setConfig(c => ({ ...c, ...patch }));
+  }, []);
+
+  const qrZoneWidthMm = getQrZoneWidthMm(
+    config.qrLayoutMode,
+    config.supportType,
+    currentDims.heightMm,
+    config.qrContainerMm || 50
+  );
+  const designWidthMm = currentDims.designWidthMm ?? Math.max(10, currentDims.widthMm - qrZoneWidthMm);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 flex justify-center items-center relative">
-      <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl overflow-hidden flex h-[85vh] min-h-[750px]">
-        
-        {/* SIDEBAR DE CONFIGURATION (40%) */}
-        <aside className="w-2/5 p-6 border-r border-gray-200 overflow-y-auto space-y-6 flex flex-col justify-between">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Billet & Badge Editor</h2>
-              <p className="text-xs text-gray-500 mt-1">Vos visuels sont scalés au pixel près, sans étirement ni rognage.</p>
-            </div>
+    <div className="dash-page flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-screen badge-editor-page">
+      <div className="relative z-10 max-w-container-max mx-auto px-gutter pb-12 pt-24 md:pt-28">
+        <AppPageHeader
+          title="Billet & Badge Editor"
+          subtitle="Vos visuels sont scalés au pixel près, sans étirement ni rognage."
+        />
 
-            {/* Support & Format */}
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Type de support</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button 
-                    onClick={() => handleSupportTypeChange('ticket')}
-                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg border font-medium text-xs transition-all ${config.supportType === 'ticket' ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    <Layout size={14} /> Ticket
-                  </button>
-                  <button 
-                    onClick={() => handleSupportTypeChange('invitation')}
-                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg border font-medium text-xs transition-all ${config.supportType === 'invitation' ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    <Mail size={14} /> Invitation
-                  </button>
-                  <button 
-                    onClick={() => handleSupportTypeChange('badge')}
-                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg border font-medium text-xs transition-all ${config.supportType === 'badge' ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    <Edit size={14} /> Badge Pro
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Disposition Papier</label>
-                <select 
-                  value={config.layoutOption} 
-                  onChange={(e) => handleLayoutChange(e.target.value as LayoutOption)} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none"
+        <div className="badge-editor-shell">
+          <aside className="badge-editor-sidebar">
+            <div className="badge-editor-section">
+              <p className="badge-editor-section__title">
+                <Layout size={14} />
+                Type de support
+              </p>
+              <div className="badge-segment">
+                <button
+                  type="button"
+                  onClick={() => handleSupportTypeChange('invitation')}
+                  className={`badge-segment__btn ${config.supportType === 'invitation' ? 'badge-segment__btn--active' : ''}`}
                 >
-                  <option value="1_col">1 colonne (Conseillé pour Invitations / Plein format)</option>
-                  <option value="2_col">2 colonnes (Format Ticket Standard)</option>
-                  <option value="3_col">3 colonnes (Format Badge Standard 85x54mm)</option>
+                  <Layout size={14} /> Ticket/Invitation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSupportTypeChange('badge')}
+                  className={`badge-segment__btn ${config.supportType === 'badge' ? 'badge-segment__btn--active' : ''}`}
+                >
+                  <Edit size={14} /> Badge Pro
+                </button>
+              </div>
+              <div className="mt-4">
+                <label className="badge-field-label">Disposition papier</label>
+                <select
+                  value={config.layoutOption}
+                  onChange={(e) => handleLayoutChange(e.target.value as LayoutOption)}
+                  className="badge-select"
+                >
+                  <option value="1_col">1 colonne (Conseillé Ticket/Invitation — plein format)</option>
+                  <option value="2_col">2 colonnes (Ticket/Invitation compact)</option>
+                  <option value="3_col">3 colonnes (Format Badge Standard 85×54 mm)</option>
                 </select>
               </div>
             </div>
 
-            {/* Marges */}
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-              <div className="flex items-center gap-2 text-blue-600">
-                <Sliders size={16} />
-                <h3 className="font-bold text-xs uppercase tracking-wider">Gestion des Marges (Feuille A4)</h3>
-              </div>
+            <div className="badge-editor-section">
+              <p className="badge-editor-section__title">
+                <Sliders size={14} />
+                Gestion des marges (feuille A4)
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Espace Lignes (Row Gap)</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min="0" max="25" value={config.rowGap} onChange={(e) => setConfig(c => ({...c, rowGap: Number(e.target.value)}))} className="w-full accent-blue-600" />
-                    <span className="text-xs font-mono w-10 text-right">{config.rowGap}mm</span>
+                  <label className="badge-field-label">Espace lignes</label>
+                  <div className="badge-range-row">
+                    <input type="range" min="0" max="25" value={config.rowGap} onChange={(e) => setConfig(c => ({ ...c, rowGap: Number(e.target.value) }))} />
+                    <span className="badge-range-value">{config.rowGap}mm</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Espace Colonnes (Col Gap)</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min="0" max="25" value={config.colGap} onChange={(e) => setConfig(c => ({...c, colGap: Number(e.target.value)}))} className="w-full accent-blue-600" />
-                    <span className="text-xs font-mono w-10 text-right">{config.colGap}mm</span>
+                  <label className="badge-field-label">Espace colonnes</label>
+                  <div className="badge-range-row">
+                    <input type="range" min="0" max="25" value={config.colGap} onChange={(e) => setConfig(c => ({ ...c, colGap: Number(e.target.value) }))} />
+                    <span className="badge-range-value">{config.colGap}mm</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Upload Design & Note */}
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Design original (Sans déformation)</label>
-              <div ref={dropRef} className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer bg-white hover:bg-gray-50" onClick={() => document.getElementById('file-loader')?.click()}>
-                <div className="flex flex-col items-center justify-center gap-1 text-gray-500">
-                  <IconImage size={24} className="text-gray-400" />
-                  <span className="text-xs font-medium">Charger le design Canva</span>
+            <div className="badge-editor-section">
+              <p className="badge-editor-section__title">
+                <IconImage size={14} />
+                Design original
+              </p>
+              <div ref={dropRef} className="badge-upload-zone" onClick={() => document.getElementById('file-loader')?.click()}>
+                <div className="flex flex-col items-center justify-center gap-1.5 app-text-muted">
+                  <IconImage size={22} className="opacity-50" />
+                  <span className="text-xs font-semibold">Charger le design Canva</span>
                 </div>
                 <input id="file-loader" type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleFile(f); }} />
               </div>
 
-              <p className="text-[11px] text-gray-500 italic bg-blue-50/60 p-2.5 rounded-lg border border-blue-100 leading-relaxed">
-                💡 <strong>Conseil de dimension : </strong>{getIdealDimensionsText()}
+              <p className="badge-tip mt-3">
+                <strong>Conseil de dimension :</strong> {getIdealDimensionsText()}
               </p>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 mt-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Couleur par défaut</label>
-                  <input type="color" value={config.backgroundColor} onChange={(e) => setConfig(c => ({...c, backgroundColor: e.target.value}))} className="w-full h-9 rounded-lg border cursor-pointer p-0 overflow-hidden" />
+                  <label className="badge-field-label">Couleur par défaut</label>
+                  <input type="color" value={config.backgroundColor} onChange={(e) => setConfig(c => ({ ...c, backgroundColor: e.target.value }))} className="badge-color-input" />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Fond du QR</label>
-                  <select value={config.qrBg} onChange={(e) => setConfig(c => ({...c, qrBg: e.target.value as any}))} className="w-full px-2 py-1.5 border border-gray-200 rounded-lg bg-white text-sm">
-                    <option value="white">Blanc</option>
-                    <option value="black">Noir</option>
-                  </select>
-                </div>
+                {config.supportType === 'invitation' && (
+                  <>
+                    <div>
+                      <label className="badge-field-label">Fond du conteneur</label>
+                      <input type="color" value={normalizeHexColor(config.qrBg, '#0a0a0a')} onChange={(e) => setConfig(c => ({ ...c, qrBg: e.target.value }))} className="badge-color-input" />
+                    </div>
+                    <div className="col-span-2 grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="badge-field-label">Couleur du QR code</label>
+                        <input type="color" value={normalizeHexColor(config.qrFg, '#000000')} onChange={(e) => setConfig(c => ({ ...c, qrFg: e.target.value }))} className="badge-color-input" />
+                      </div>
+                      <div className="flex items-end">
+                        <p className="text-[10px] app-text-muted leading-snug pb-0.5">Appliquée à la bande latérale et au fond du carré QR.</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {config.supportType === 'badge' && (
+                  <div>
+                    <label className="badge-field-label">Fond du QR (verso)</label>
+                    <input type="color" value={normalizeHexColor(config.qrBg, '#ffffff')} onChange={(e) => setConfig(c => ({ ...c, qrBg: e.target.value }))} className="badge-color-input" />
+                  </div>
+                )}
               </div>
 
-              <div className="mt-3 border-t pt-3">
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Dimensions manuelles (cm)</label>
-                <div className="flex items-center gap-2 mb-2">
-                  <input id="manual-dims-toggle" type="checkbox" checked={manualDimsEnabled} onChange={(e) => setManualDimsEnabled(e.target.checked)} className="h-4 w-4" />
-                  <label htmlFor="manual-dims-toggle" className="text-xs text-gray-600">Activer saisie manuelle (largeur / longueur)</label>
+              <div className="mt-4 pt-4 border-t border-[var(--md-border)]">
+                <p className="badge-editor-section__title mb-3">Dimensions manuelles (cm)</p>
+                <div className="flex items-center gap-2 mb-3">
+                  <input id="manual-dims-toggle" type="checkbox" checked={manualDimsEnabled} onChange={(e) => setManualDimsEnabled(e.target.checked)} className="h-4 w-4 accent-[var(--landing-primary)]" />
+                  <label htmlFor="manual-dims-toggle" className="text-xs app-text-muted">Activer la saisie manuelle</label>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-gray-600 mb-1">Largeur (cm)</label>
-                    <input type="number" min={0.1} step={0.1} value={(config.customDimensions.width || DEFAULT_WIDTH) / 10} onChange={(e) => onManualWidthChange(Number(e.target.value || 0))} disabled={!manualDimsEnabled} className="w-full px-2 py-1 border rounded-lg text-sm" />
+                    <label className="badge-field-label">
+                      {config.qrLayoutMode === 'margin' ? 'Largeur design (cm)' : 'Largeur (cm)'}
+                    </label>
+                    <input type="number" min={0.1} step={0.1} value={(config.customDimensions.width || DEFAULT_WIDTH) / 10} onChange={(e) => onManualWidthChange(Number(e.target.value || 0))} disabled={!manualDimsEnabled} className="badge-input" />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-gray-600 mb-1">Longueur (cm)</label>
-                    <input type="number" min={0.1} step={0.1} value={(config.customDimensions.height || DEFAULT_HEIGHT) / 10} onChange={(e) => onManualHeightChange(Number(e.target.value || 0))} disabled={!manualDimsEnabled} className="w-full px-2 py-1 border rounded-lg text-sm" />
+                    <label className="badge-field-label">Longueur (cm)</label>
+                    <input type="number" min={0.1} step={0.1} value={(config.customDimensions.height || DEFAULT_HEIGHT) / 10} onChange={(e) => onManualHeightChange(Number(e.target.value || 0))} disabled={!manualDimsEnabled} className="badge-input" />
                   </div>
                 </div>
-                <div className="mt-3">
-                  <label className="block text-[11px] text-gray-600 mb-1">Largeur conteneur QR (cm)</label>
-                  <input type="number" min={0.5} step={0.1} value={((config.qrContainerMm || 50) / 10)} onChange={(e) => onManualQrSizeChange(Number(e.target.value || 0))} disabled={!manualDimsEnabled} className="w-40 px-2 py-1 border rounded-lg text-sm" />
-                </div>
-                <p className="text-[11px] text-gray-500 italic mt-2">Lorsque vous modifiez une valeur, l'autre est recalculée automatiquement pour préserver le ratio de l'image et éviter toute déformation. Si aucune image n'est chargée, le ratio courant du design sera utilisé.</p>
+                <p className="text-[11px] app-text-muted mt-2">Utilisez l&apos;aperçu unitaire pour positionner et redimensionner le QR visuellement.</p>
               </div>
             </div>
 
-            {/* Recto/Verso */}
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Emplacement du QR Code</label>
-                <select 
-                  value={config.qrPosition} 
-                  disabled={config.supportType === 'ticket' || config.supportType === 'invitation'} 
-                  onChange={(e) => setConfig(c => ({...c, qrPosition: e.target.value as any}))} 
-                  className="px-3 py-1.5 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none"
+            <div className="badge-editor-section">
+              <p className="badge-editor-section__title">Style de positionnement QR</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleQrLayoutModeChange('margin')}
+                  disabled={config.supportType === 'badge'}
+                  className={`badge-mode-card ${config.qrLayoutMode === 'margin' ? 'badge-mode-card--active' : ''}`}
                 >
-                  <option value="front">Face avant (Front)</option>
-                  <option value="back">Dans le dos (Back - Recto/Verso)</option>
+                  Marge
+                  <span className="badge-mode-card__hint">QR dans une bande colorée — libellés blancs en vertical</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQrLayoutModeChange('embedded')}
+                  disabled={config.supportType === 'badge'}
+                  className={`badge-mode-card badge-mode-card--embedded ${config.qrLayoutMode === 'embedded' ? 'badge-mode-card--active' : ''}`}
+                >
+                  Incrusté
+                  <span className="badge-mode-card__hint">QR positionné sur le visuel importé</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 mt-4">
+                <label className="badge-field-label mb-0 shrink-0">Emplacement QR</label>
+                <select
+                  value={config.qrPosition}
+                  disabled={config.supportType === 'invitation'}
+                  onChange={(e) => setConfig(c => ({ ...c, qrPosition: e.target.value as 'front' | 'back' }))}
+                  className="badge-select max-w-[11rem]"
+                >
+                  <option value="front">Face avant</option>
+                  <option value="back">Verso (Recto/Verso)</option>
                 </select>
               </div>
 
               {config.qrPosition === 'back' && (
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium text-gray-600">Consignes au verso</label>
-                  <textarea rows={2} value={config.backText} onChange={(e) => setConfig(c => ({...c, backText: e.target.value}))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none" />
+                <div className="mt-3">
+                  <label className="badge-field-label">Consignes au verso</label>
+                  <textarea rows={2} value={config.backText} onChange={(e) => setConfig(c => ({ ...c, backText: e.target.value }))} className="badge-input resize-none" />
                 </div>
               )}
             </div>
-          </div>
 
-            <div className="pt-4 border-t border-gray-100">
-            <button className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md" onClick={handleOpenModal} disabled={genPhase === 'running'}>
+            <button type="button" className="badge-editor-cta mt-auto" onClick={handleOpenModal} disabled={genPhase === 'running'}>
               Continuer
             </button>
-          </div>
-        </aside>
+          </aside>
 
-        {/* SECTION DE PREVIEW (60%) */}
-        <section className="w-3/5 bg-gray-50 p-6 flex flex-col">
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200/60">
-            <div className="bg-gray-200/70 p-1 rounded-xl flex gap-1">
-              <button className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${config.activeTab === 'single' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`} onClick={() => setConfig(c => ({...c, activeTab: 'single'}))}>
-                Aperçu Unitaire
-              </button>
-              <button className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${config.activeTab === 'sheet' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`} onClick={() => setConfig(c => ({...c, activeTab: 'sheet'}))}>
-                Aperçu Feuille A4
-              </button>
-            </div>
+          <section className="badge-editor-stage">
+            <div className="badge-editor-stage__toolbar">
+              <div className="badge-editor-tabs">
+                <button type="button" className={`badge-editor-tab ${config.activeTab === 'single' ? 'badge-editor-tab--active' : ''}`} onClick={() => setConfig(c => ({ ...c, activeTab: 'single' }))}>
+                  Aperçu unitaire
+                </button>
+                <button type="button" className={`badge-editor-tab ${config.activeTab === 'sheet' ? 'badge-editor-tab--active' : ''}`} onClick={() => setConfig(c => ({ ...c, activeTab: 'sheet' }))}>
+                  Aperçu feuille A4
+                </button>
+              </div>
 
-            <div>
               {config.supportType === 'badge' && (
-                <button title="Retourner le Badge" className="p-1.5 border bg-white rounded-lg hover:shadow-sm" onClick={() => setFlipped(f => !f)}><RefreshCw size={14} /></button>
+                <button type="button" title="Retourner le badge" className="landing-chip" onClick={() => setFlipped(f => !f)}>
+                  <RefreshCw size={14} />
+                  Retourner
+                </button>
               )}
             </div>
-          </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-auto space-y-4">
-            
-            {/* EN-TÊTE DYNAMIQUE DOUBLE ENTRÉE */}
-            {config.activeTab === 'sheet' && (
-              <div className="w-[400px] bg-slate-900 text-white px-3 py-2 rounded-xl flex items-center justify-between shadow-md border border-slate-800 animate-fadeIn text-[11px]">
-                <div className="flex items-center gap-1.5">
-                  <Maximize2 size={13} className="text-blue-400 shrink-0" />
-                  <span className="text-slate-400 font-medium">Taille :</span>
-                  <span className="font-mono font-bold text-white">
-                    {currentDims.widthMm / 10}x{currentDims.heightMm / 10} cm
-                  </span>
+            <div className="badge-editor-canvas">
+
+              {config.activeTab === 'sheet' && (
+                <div className="badge-sheet-stats animate-fadeIn">
+                  <div className="badge-sheet-stats__item">
+                    <Maximize2 size={13} className="text-blue-400 shrink-0" />
+                    <span className="opacity-70">Taille</span>
+                    <span className="badge-sheet-stats__value">
+                      {currentDims.widthMm / 10}×{currentDims.heightMm / 10} cm
+                    </span>
+                  </div>
+                  <div className="badge-sheet-stats__item">
+                    <Hash size={13} className="text-emerald-400 shrink-0" />
+                    <span className="opacity-70">Rendement</span>
+                    <span className="badge-sheet-stats__value text-emerald-400">
+                      {totalTicketsCount} {config.supportType === 'invitation' ? 'billet' : 'badge'}{totalTicketsCount > 1 ? 's' : ''}/page
+                    </span>
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700/60">
-                  <Hash size={13} className="text-emerald-400 shrink-0" />
-                  <span className="text-slate-300">Rendement :</span>
-                  <span className="font-bold text-emerald-400 font-mono">
-                    {totalTicketsCount} {config.supportType === 'ticket' ? 'billet' : config.supportType === 'invitation' ? 'invitation' : 'badge'}{totalTicketsCount > 1 ? 's' : ''} / page
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* 1. APERÇU UNITAIRE */}
+              )}
             {config.activeTab === 'single' && (
               <div className="w-full flex flex-col items-center justify-center gap-6">
-                {config.supportType === 'ticket' && (
-                  <div 
-                    className="flex flex-row items-stretch gap-0 p-0 shadow-2xl border border-gray-300 rounded-lg overflow-hidden"
-                    style={{ 
-                      height: `150px`, 
-                      width: `${(150 * (imgNatural ? imgNatural.width / imgNatural.height : 2.5)) + 150}px`
-                    }}
-                  >
-                    <div className="h-full relative flex items-center justify-center" style={{ width: `${150 * (imgNatural ? imgNatural.width / imgNatural.height : 2.5)}px`, backgroundColor: config.backgroundColor }}>
-                      {imgPreviewUrl ? (
-                        <img src={imgPreviewUrl} alt="ticket" className="w-full h-full object-contain block" />
-                      ) : (
-                        <span className="text-xs font-bold text-gray-400 text-center p-4">{config.name}</span>
-                      )}
-                    </div>
-                    <div className="h-full aspect-square flex items-center justify-center border-l border-dashed border-gray-400/80 p-3" style={{ backgroundColor: config.qrBg === 'white' ? '#ffffff' : '#000000' }}>
-                      <div className="w-full h-full border-2 border-current flex items-center justify-center font-black text-xs rounded" style={{ color: config.qrBg === 'white' ? '#000000' : '#ffffff' }}>QR</div>
-                    </div>
-                  </div>
-                )}
-
                 {config.supportType === 'invitation' && (
-                  <div 
-                    className="flex flex-row items-stretch gap-0 p-0 shadow-2xl border border-gray-300 rounded-lg overflow-hidden max-w-full animate-fadeIn"
-                    style={{ 
-                      height: `160px`, 
-                      width: `${(160 * (imgNatural ? imgNatural.width / imgNatural.height : 2.5)) + (50 * (160 / (imgNatural ? (imgNatural.width / (imgNatural.width / imgNatural.height)) : 160)))}px` 
+                  <QrInteractivePreview
+                    supportType={config.supportType}
+                    layout={{
+                      qrLayoutMode: config.qrLayoutMode,
+                      qrContainerMm: config.qrContainerMm || 50,
+                      qrSizeMm: config.qrSizeMm || 40,
+                      qrPosX: config.qrPosX,
+                      qrPosY: config.qrPosY,
+                      qrBg: config.qrBg,
+                      qrFg: config.qrFg,
                     }}
-                  >
-                    {/* Zone Image dynamique */}
-                    <div className="flex-1 h-full relative flex items-center justify-center" style={{ backgroundColor: config.backgroundColor }}>
-                      {imgPreviewUrl ? (
-                        <img src={imgPreviewUrl} alt="invitation visual" className="w-full h-full object-contain block" />
-                      ) : (
-                        <span className="text-xs font-bold text-gray-400 text-center p-4">{config.name} (Visuel)</span>
-                      )}
-                    </div>
-                    {/* Zone QR Fixe bridée à 5 cm maximum */}
-                    <div 
-                      className="h-full flex items-center justify-center border-l border-dashed border-gray-400/80 p-2 shrink-0 bg-white" 
-                      style={{ 
-                        width: `${50 * (160 / currentDims.heightMm)}px`,
-                        backgroundColor: config.qrBg === 'white' ? '#ffffff' : '#000000' 
-                      }}
-                    >
-                      <div 
-                        className="border-2 border-current flex items-center justify-center font-black text-[10px] rounded shrink-0" 
-                        style={{ 
-                          width: `${40 * (160 / currentDims.heightMm)}px`, 
-                          height: `${40 * (160 / currentDims.heightMm)}px`, 
-                          color: config.qrBg === 'white' ? '#000000' : '#ffffff' 
-                        }}
-                      >
-                        QR 4x4
-                      </div>
-                    </div>
-                  </div>
+                    designWidthMm={designWidthMm}
+                    designHeightMm={currentDims.heightMm}
+                    imgPreviewUrl={imgPreviewUrl}
+                    backgroundColor={config.backgroundColor}
+                    designLabel={config.name}
+                    onChange={patchQrLayout}
+                  />
                 )}
 
                 {config.supportType === 'badge' && (
                   <div className="w-full max-w-[280px] flex flex-col items-center gap-6">
                     {(!flipped || config.qrPosition === 'front') && (
-                      <div className="w-full aspect-[85/54] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden relative flex items-center justify-center">
+                      <div className="w-full aspect-[85/54] badge-preview-frame rounded-lg overflow-hidden relative flex items-center justify-center border border-black">
                         {imgPreviewUrl ? (
                           <img src={imgPreviewUrl} alt="badge front" className="w-full h-full object-contain block" />
                         ) : (
-                          <span className="text-sm font-bold text-gray-400">{config.name} - RECTO</span>
+                          <span className="text-sm font-bold app-text-muted">{config.name} — Recto</span>
                         )}
                       </div>
                     )}
                     {(flipped || config.qrPosition === 'back') && (
-                      <div className="w-full aspect-[85/54] rounded-lg shadow-xl border border-gray-200 flex flex-col items-center justify-between p-4 relative" style={{ backgroundColor: config.qrBg === 'white' ? '#ffffff' : '#111827', color: config.qrBg === 'white' ? '#000000' : '#ffffff' }}>
+                      <div className="w-full aspect-[85/54] badge-preview-frame rounded-lg flex flex-col items-center justify-between p-4 relative border border-black" style={{ backgroundColor: normalizeHexColor(config.qrBg, '#ffffff'), color: getContrastTextColor(normalizeHexColor(config.qrBg, '#ffffff')) }}>
                         <div className="w-14 h-14 border-2 border-current flex items-center justify-center font-bold text-xs rounded mx-auto mt-2">QR</div>
                         <p className="text-[10px] text-center opacity-80 px-2 line-clamp-2 mb-1">{config.backText}</p>
                         <span className="text-[8px] opacity-40 uppercase tracking-wider">Verso</span>
@@ -797,13 +899,12 @@ export default function TicketBadgeEditor() {
             {/* 2. APERÇU FEUILLE A4 */}
             {config.activeTab === 'sheet' && (
               <div className="w-full flex items-center justify-center">
-                <div 
-                  className="bg-white shadow-2xl border border-gray-300 p-4 overflow-hidden flex flex-col justify-start"
+                <div
+                  className="badge-preview-frame p-4 overflow-hidden flex flex-col justify-start"
                   style={{ width: `${SHEET_PREVIEW_WIDTH_PX}px`, height: `${SHEET_PREVIEW_HEIGHT_PX}px` }}
                 >
                   {(() => {
                     const isBadge = config.supportType === 'badge';
-                    const isInvitation = config.supportType === 'invitation';
                     const AVAILABLE_WIDTH_PX = SHEET_PREVIEW_WIDTH_PX - 32; 
 
                     const rGapPx = config.rowGap * MM_TO_PX;
@@ -811,51 +912,23 @@ export default function TicketBadgeEditor() {
                     const MM_TO_PX_HEIGHT = SHEET_PREVIEW_HEIGHT_PX / 297;
 
                     // Default column width if auto (based on available A4 preview)
-                    let colWidthPx = (AVAILABLE_WIDTH_PX - (cGapPx * (sheetCols - 1))) / sheetCols;
-                    let rowHeightPx = colWidthPx * (54 / 85);
+                    let colWidthPx = currentDims.widthMm * MM_TO_PX;
+                    let rowHeightPx = currentDims.heightMm * MM_TO_PX_HEIGHT;
 
-                    // If manual dimensions are enabled, compute pixel sizes from mm values
-                    if (manualDimsEnabled) {
-                      const manualTotalColPx = config.customDimensions.width * MM_TO_PX;
-                      const manualRowPx = config.customDimensions.height * MM_TO_PX_HEIGHT;
-                      // Do not let manual column width exceed the per-column available space
-                      const maxPerCol = (AVAILABLE_WIDTH_PX - (cGapPx * (sheetCols - 1))) / sheetCols;
-                      const totalColPx = Math.min(manualTotalColPx, maxPerCol);
-
-                      // QR container width comes from config.qrContainerMm; image width is the remainder
-                      const qrContainerPx = (config.qrContainerMm || 50) * MM_TO_PX;
-                      const imageWidthPx = Math.max(0, totalColPx - qrContainerPx);
-
-                      colWidthPx = totalColPx;
-                      if (imgNatural) {
-                        // imageHeight computed from imageWidth keeping aspect ratio
-                        const imageHeightPx = imageWidthPx / (imgNatural.width / imgNatural.height);
-                        rowHeightPx = imageHeightPx;
+                    if (!manualDimsEnabled && !isBadge && imgNatural) {
+                      colWidthPx = (AVAILABLE_WIDTH_PX - (cGapPx * (sheetCols - 1))) / sheetCols;
+                      if (config.qrLayoutMode === 'embedded') {
+                        rowHeightPx = colWidthPx / (imgNatural.width / imgNatural.height);
                       } else {
-                        rowHeightPx = manualRowPx;
-                      }
-                    } else if (!isBadge && imgNatural) {
-                      // previous automatic behaviour based on image natural ratio
-                      if (isInvitation) {
-                        const qrWidthPx = 50 * MM_TO_PX;
+                        const qrWidthPx = (config.qrContainerMm || 50) * MM_TO_PX;
                         const imageWidthPx = Math.max(30, colWidthPx - qrWidthPx);
-                        rowHeightPx = imageWidthPx / (imgNatural.width / imgNatural.height);
-                      } else {
-                        // Enforce imageWidth = qrWidth = half of column
-                        const imageWidthPx = colWidthPx / 2;
                         rowHeightPx = imageWidthPx / (imgNatural.width / imgNatural.height);
                       }
                     }
 
-                    // Use an explicit rendered row height to ensure preview and counting
-                    const renderedRowHeightPx = (() => {
-                      let h = rowHeightPx;
-                      if (manualDimsEnabled) {
-                        const manualRowPx = config.customDimensions.height * MM_TO_PX_HEIGHT;
-                        h = Math.max(h, manualRowPx);
-                      }
-                      return h;
-                    })();
+                    const renderedRowHeightPx = manualDimsEnabled
+                      ? Math.max(rowHeightPx, (config.customDimensions.height || DEFAULT_HEIGHT) * MM_TO_PX_HEIGHT)
+                      : rowHeightPx;
 
                     return (
                       <div 
@@ -869,87 +942,90 @@ export default function TicketBadgeEditor() {
                       >
                         {
                           (() => {
-                            const stats = getLiveTotalCount(sheetCols, config.supportType, imgNatural);
+                            const stats = getLiveTotalCount(sheetCols, config.supportType, imgNatural, currentDims);
                             const totalVisibleTickets = stats.total;
+                            const marginDesignWidthPx = (currentDims.designWidthMm ?? currentDims.widthMm) * MM_TO_PX;
+                            const marginQrWidthPx = qrZoneWidthMm * MM_TO_PX;
+                            const marginQrPosZonePx = getMarginQrPosZoneMm(qrZoneWidthMm) * MM_TO_PX;
+                            const labelStripPx = MARGIN_LABEL_COL_MM * MM_TO_PX;
+                            const containerBg = normalizeHexColor(config.qrBg, '#0a0a0a');
+                            const qrFgColor = normalizeHexColor(config.qrFg, '#000000');
+                            const embeddedDesignWidthPx = (currentDims.designWidthMm ?? currentDims.widthMm - MARGIN_LABEL_COL_MM) * MM_TO_PX;
                             return Array.from({ length: totalVisibleTickets }).map((_, idx) => {
-                              if (isInvitation) {
-                                const qrContainerPx = (config.qrContainerMm || 50) * MM_TO_PX;
-                                const imageAreaWidthPx = Math.max(0, colWidthPx - qrContainerPx);
+                              const cellPxPerMm = renderedRowHeightPx / Math.max(currentDims.heightMm, 1);
+                              const qrSizePx = (config.qrSizeMm || 40) * cellPxPerMm;
+
+                              const renderQrOverlay = (zoneWidthPx: number, zoneHeightPx: number) => {
+                                const cx = (config.qrPosX / 100) * zoneWidthPx;
+                                const cy = (config.qrPosY / 100) * zoneHeightPx;
                                 return (
-                                  <div 
-                                    key={idx} 
-                                    className="flex flex-row items-stretch gap-0 p-0 border border-gray-200 overflow-hidden"
-                                    style={{ height: `${renderedRowHeightPx}px`, backgroundColor: config.backgroundColor }}
+                                  <div
+                                    className="absolute border flex items-center justify-center text-[7px] font-bold rounded z-10"
+                                    style={{
+                                      left: `${cx - qrSizePx / 2}px`,
+                                      top: `${cy - qrSizePx / 2}px`,
+                                      width: `${qrSizePx}px`,
+                                      height: `${qrSizePx}px`,
+                                      backgroundColor: containerBg,
+                                      borderColor: qrFgColor,
+                                      color: qrFgColor,
+                                    }}
                                   >
-                                    <div className="overflow-hidden flex items-center justify-center" style={{ width: `${imageAreaWidthPx}px`, height: `${rowHeightPx}px` }}>
-                                      {imgPreviewUrl && <img src={imgPreviewUrl} alt="invitation" className="w-full h-full object-contain block" />}
+                                    QR
+                                  </div>
+                                );
+                              };
+
+                              if (config.qrLayoutMode === 'embedded' && !isBadge) {
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="relative flex flex-row border border-black overflow-hidden shrink-0"
+                                    style={{ width: `${colWidthPx}px`, height: `${renderedRowHeightPx}px`, backgroundColor: config.backgroundColor }}
+                                  >
+                                    <div className="relative overflow-hidden shrink-0" style={{ width: `${embeddedDesignWidthPx}px`, height: `${renderedRowHeightPx}px` }}>
+                                      {imgPreviewUrl ? (
+                                        <img src={imgPreviewUrl} alt="design" className="h-full w-full object-contain object-left block" />
+                                      ) : (
+                                        <span className="text-[8px] font-bold text-gray-400 p-2">{config.name}</span>
+                                      )}
+                                      {renderQrOverlay(embeddedDesignWidthPx, renderedRowHeightPx)}
                                     </div>
-                                    <div 
-                                      className="h-full flex items-center justify-center border-l border-dashed border-gray-200 shrink-0"
-                                      style={{ 
-                                        width: `${qrContainerPx}px`,
-                                        backgroundColor: config.qrBg === 'white' ? '#fff' : '#000', 
-                                        color: config.qrBg === 'white' ? '#000' : '#fff' 
-                                      }}
-                                    >
-                                      <div 
-                                        className="border flex items-center justify-center text-[7px] font-bold rounded"
-                                        style={{ 
-                                          width: `${Math.min(renderedRowHeightPx - 6, (config.qrContainerMm || 50) * MM_TO_PX)}px`, 
-                                          height: `${Math.min(renderedRowHeightPx - 6, (config.qrContainerMm || 50) * MM_TO_PX)}px`,
-                                          borderColor: 'currentColor'
-                                        }}
-                                      >
-                                        QR
-                                      </div>
-                                    </div>
+                                    <TicketLabelColumn
+                                      heightPx={renderedRowHeightPx}
+                                      backgroundColor={containerBg}
+                                      widthPx={labelStripPx}
+                                    />
                                   </div>
                                 );
                               }
 
-                              if (!isBadge) {
-                                const qrContainerPx = (config.qrContainerMm || 50) * MM_TO_PX;
+                              if (!isBadge && config.qrLayoutMode !== 'embedded') {
                                 return (
-                                  <div key={idx} className="relative flex items-center justify-between p-0 overflow-hidden border border-gray-200" style={{ height: `${renderedRowHeightPx}px`, backgroundColor: config.backgroundColor }}>
-                                    <div className="w-full h-full flex items-center justify-between gap-3 text-left p-3">
-                                      {/* ZONE TEXTE / IMAGE : prend tout l'espace sauf le QR */}
-                                      <div className="flex-1 min-w-0 flex items-center justify-center">
-                                        {imgPreviewUrl ? (
-                                          <div className="w-full h-full overflow-hidden flex items-center justify-center">
-                                            <img src={imgPreviewUrl} alt="t" className="w-full h-full object-contain block" />
-                                          </div>
-                                        ) : (
-                                          <div className="flex-1 min-w-0 flex flex-col justify-center space-y-1">
-                                            <span className="text-xs font-bold text-gray-900 truncate uppercase tracking-wide">{config.name}</span>
-                                            <span className="text-[10px] text-gray-500 truncate">Ticket #{idx + 1}</span>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* ZONE QR CODE : Taille fixe, ne se réduit pas */}
-                                      <div 
-                                        style={{ 
-                                          width: `${qrContainerPx}px`,
-                                          height: `${qrContainerPx}px`
-                                        }}
-                                        className="flex-shrink-0 bg-white p-1 rounded-lg shadow-2xs flex items-center justify-center"
-                                      >
-                                        <div className="w-full h-full bg-gray-200 rounded animate-pulse" />
-                                      </div>
+                                  <div 
+                                    key={idx} 
+                                    className="relative flex flex-row items-stretch gap-0 p-0 border border-black overflow-hidden shrink-0"
+                                    style={{ width: `${colWidthPx}px`, height: `${renderedRowHeightPx}px`, backgroundColor: config.backgroundColor }}
+                                  >
+                                    <div className="overflow-hidden flex items-center justify-start shrink-0" style={{ width: `${marginDesignWidthPx}px`, height: `${renderedRowHeightPx}px` }}>
+                                      {imgPreviewUrl && <img src={imgPreviewUrl} alt="ticket" className="h-full w-full object-contain object-left block" />}
                                     </div>
+                                    <TicketMarginStrip widthPx={marginQrWidthPx} heightPx={renderedRowHeightPx} backgroundColor={containerBg}>
+                                      {renderQrOverlay(marginQrPosZonePx, renderedRowHeightPx)}
+                                    </TicketMarginStrip>
                                   </div>
                                 );
                               }
 
                               if (isBadge && config.qrPosition === 'back') {
                                 return (
-                                  <div key={idx} className="flex items-stretch gap-0 border border-gray-200 overflow-hidden" style={{ height: `${renderedRowHeightPx}px` }}>
+                                  <div key={idx} className="flex items-stretch gap-0 border border-black overflow-hidden" style={{ height: `${renderedRowHeightPx}px` }}>
                                     <div className="w-1/2 h-full border-r border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
                                       {imgPreviewUrl ? <img src={imgPreviewUrl} alt="f" className="w-full h-full object-contain block" /> : <span className="text-[7px] font-bold text-gray-400">Front</span>}
                                     </div>
                                     <div 
                                       className="w-1/2 h-full flex flex-col items-center justify-center p-1"
-                                      style={{ backgroundColor: config.qrBg === 'white' ? '#fff' : '#111827', color: config.qrBg === 'white' ? '#000' : '#fff' }}
+                                      style={{ backgroundColor: normalizeHexColor(config.qrBg, '#ffffff'), color: getContrastTextColor(normalizeHexColor(config.qrBg, '#ffffff')) }}
                                     >
                                       <div className="w-4 h-4 border border-current flex items-center justify-center text-[5px] font-bold rounded">QR</div>
                                     </div>
@@ -958,7 +1034,7 @@ export default function TicketBadgeEditor() {
                               }
 
                               return (
-                                <div key={idx} className="w-full border border-gray-200 bg-white overflow-hidden flex items-center justify-center" style={{ height: `${renderedRowHeightPx}px` }}>
+                                <div key={idx} className="w-full border border-black bg-white overflow-hidden flex items-center justify-center" style={{ height: `${renderedRowHeightPx}px` }}>
                                   {imgPreviewUrl ? (
                                     <img src={imgPreviewUrl} alt="b" className="w-full h-full object-contain block" />
                                   ) : (
@@ -976,88 +1052,83 @@ export default function TicketBadgeEditor() {
               </div>
             )}
 
-          </div>
-        </section>
+            </div>
+          </section>
+        </div>
       </div>
 
-      {/* GENERATION MODAL */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="font-bold text-lg mb-3">Génération des billets</h3>
+        <div className="fixed inset-0 badge-modal-backdrop flex items-center justify-center z-50 p-4">
+          <div className="badge-modal p-6 w-full max-w-md">
+            <h3 className="font-landing-display text-lg app-heading mb-4">Génération des billets</h3>
             {genPhase === 'idle' && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium">Événement</label>
-                  <select className="w-full px-3 py-2 border rounded-lg" value={selectedEventForGen || ''} onChange={(e) => setSelectedEventForGen(e.target.value)}>
-                    <option value="">-- Sélectionnez --</option>
+                  <label className="badge-field-label">Événement</label>
+                  <select className="badge-select" value={selectedEventForGen || ''} onChange={(e) => setSelectedEventForGen(e.target.value)}>
+                    <option value="">— Sélectionnez —</option>
                     {orgEvents.map((ev) => <option key={ev.id} value={ev.id}>{ev.title || ev.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium">Prix du billet (€)</label>
-                  <input type="number" min={0} step="0.01" value={ticketPrice} onChange={(e) => setTicketPrice(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="badge-field-label">Prix du billet (€)</label>
+                  <input type="number" min={0} step="0.01" value={ticketPrice} onChange={(e) => setTicketPrice(Number(e.target.value))} className="badge-input" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium">Nombre de billets</label>
-                  <input type="number" min={1} value={ticketCount} onChange={(e) => setTicketCount(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="badge-field-label">Nombre de billets</label>
+                  <input type="number" min={1} value={ticketCount} onChange={(e) => setTicketCount(Number(e.target.value))} className="badge-input" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium">Type de billet</label>
-                  <div className="flex gap-3 mt-2 items-center">
-                    <div className="flex gap-2 flex-wrap">
-                      {ticketTypes.length > 0 ? (
-                        ticketTypes.map((tt) => (
-                          <label key={tt.id} className={`flex items-center gap-2 px-3 py-2 border rounded cursor-pointer ${ticketType === tt.name ? 'bg-blue-50 border-blue-300' : ''}`}>
-                            <input type="radio" name="ticket_type" value={tt.name} checked={ticketType === tt.name} onChange={() => setTicketType(tt.name)} />
-                            <span className="text-sm">{tt.name}</span>
-                          </label>
-                        ))
-                      ) : (
-                        <span className="text-sm text-gray-500">Aucun type défini pour cet événement</span>
-                      )}
-                    </div>
-
-                    {/* bouton d'ajout retiré - ajout des types géré ailleurs */}
+                  <label className="badge-field-label">Type de billet</label>
+                  <div className="flex gap-2 flex-wrap mt-2">
+                    {ticketTypes.length > 0 ? (
+                      ticketTypes.map((tt) => (
+                        <label key={tt.id} className={`landing-chip cursor-pointer ${ticketType === tt.name ? 'landing-chip--active' : ''}`}>
+                          <input type="radio" name="ticket_type" value={tt.name} checked={ticketType === tt.name} onChange={() => setTicketType(tt.name)} className="sr-only" />
+                          {tt.name}
+                        </label>
+                      ))
+                    ) : (
+                      <span className="text-sm app-text-muted">Aucun type défini pour cet événement</span>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2 mt-2">
-                  <button className="flex-1 py-2 rounded-lg bg-blue-600 text-white" onClick={handleGenerate}>Générer</button>
-                  <button className="flex-1 py-2 rounded-lg border" onClick={() => setModalOpen(false)}>Annuler</button>
+                <div className="flex gap-2 pt-2">
+                  <button type="button" className="badge-editor-cta flex-1" onClick={handleGenerate}>Générer</button>
+                  <button type="button" className="flex-1 py-2.5 rounded-xl border border-[var(--md-border)] app-text-muted font-semibold text-sm hover:bg-[var(--md-surface-muted)] transition-colors" onClick={() => setModalOpen(false)}>Annuler</button>
                 </div>
               </div>
             )}
 
-            {/* Inline add ticket-type floating modal */}
             {addingTypeOpen && (
-              <div className="mt-3 p-3 border rounded bg-white shadow-lg">
-                <label className="text-xs block mb-1">Nouveau type de billet</label>
+              <div className="mt-3 p-3 badge-editor-section">
+                <label className="badge-field-label">Nouveau type de billet</label>
                 <div className="flex gap-2">
-                  <input value={newTicketTypeName} onChange={(e) => setNewTicketTypeName(e.target.value)} className="flex-1 px-3 py-2 border rounded" />
-                  <button onClick={addNewTicketType} disabled={addingTypeLoading} className={`px-3 py-2 rounded ${addingTypeLoading ? 'bg-gray-300' : 'bg-green-600 text-white'}`}>
-                    {addingTypeLoading ? '...' : 'Ajouter'}
+                  <input value={newTicketTypeName} onChange={(e) => setNewTicketTypeName(e.target.value)} className="badge-input flex-1" />
+                  <button type="button" onClick={addNewTicketType} disabled={addingTypeLoading} className={`px-3 py-2 rounded-lg text-sm font-semibold ${addingTypeLoading ? 'opacity-50' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
+                    {addingTypeLoading ? '…' : 'Ajouter'}
                   </button>
                 </div>
               </div>
             )}
 
             {(genPhase === 'running' || genPhase === 'done' || genPhase === 'error') && (
-              <div className="space-y-6 py-4">
+              <div className="space-y-6 py-2">
                 <div className="flex flex-col gap-4">
                   {genLog.map((l, i) => (
                     <div key={i} className="flex items-center gap-3 animate-in slide-in-from-left-2 duration-300">
                       {l.startsWith('✓') ? (
-                        <div className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center shadow-sm">
+                        <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
                           <Check size={14} strokeWidth={3} />
                         </div>
                       ) : l.startsWith('❌') ? (
-                        <div className="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                        <div className="w-6 h-6 rounded-full bg-red-500/15 text-red-600 flex items-center justify-center">
                           <AlertTriangle size={14} />
                         </div>
                       ) : (
-                        <div className="w-6 h-6 rounded-full border-2 border-blue-600 border-t-transparent animate-spin"></div>
+                        <div className="w-6 h-6 rounded-full border-2 border-[var(--landing-primary)] border-t-transparent animate-spin" />
                       )}
-                      <span className={`text-sm ${l.startsWith('✓') ? 'text-gray-600' : l.startsWith('❌') ? 'text-red-600 font-bold' : 'text-blue-600 font-medium'}`}>
+                      <span className={`text-sm ${l.startsWith('✓') ? 'app-text-muted' : l.startsWith('❌') ? 'text-red-600 font-bold' : 'text-[var(--landing-primary)] font-medium'}`}>
                         {l.replace(/^✓\s|^\❌\s|^⋯\s/, '')}
                       </span>
                     </div>
@@ -1065,37 +1136,36 @@ export default function TicketBadgeEditor() {
                 </div>
 
                 {genPhase === 'done' && (
-                  <div className="pt-6 border-t border-gray-100 animate-in fade-in zoom-in-95 duration-500">
-                    <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-6">
-                      <p className="text-sm text-emerald-800 font-semibold text-center">
-                        Vos billets sont prêts ! Le design respecte les réglages de votre éditeur.
-                      </p>
+                  <div className="pt-4 border-t border-[var(--md-border)] animate-in fade-in zoom-in-95 duration-500">
+                    <div className="badge-tip mb-5 text-center">
+                      Vos billets sont prêts. Le design respecte les réglages de votre éditeur.
                     </div>
-                    
                     <div className="flex flex-col gap-3">
                       {pdfUrl && (
-                        <a 
-                          href={pdfUrl} 
+                        <a
+                          href={pdfUrl}
                           download={`billets-${selectedEventForGen}.pdf`}
-                          className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-center shadow-lg hover:shadow-blue-200 transition-all flex items-center justify-center gap-2"
+                          className="badge-editor-cta py-3.5 flex items-center justify-center gap-2 no-underline"
                         >
-                          <Download size={20} /> Télécharger le PDF
+                          <Download size={18} /> Télécharger le PDF
                         </a>
                       )}
-                      <button 
-                        className="w-full py-3 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                      <button
+                        type="button"
+                        className="w-full py-2.5 app-text-muted hover:app-heading text-sm font-medium transition-colors"
                         onClick={() => { setModalOpen(false); setGenPhase('idle'); }}
                       >
-                        Retour à l'éditeur
+                        Retour à l&apos;éditeur
                       </button>
                     </div>
                   </div>
                 )}
 
                 {genPhase === 'error' && (
-                  <div className="pt-4 border-t border-gray-100">
-                    <button 
-                      className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-all"
+                  <div className="pt-4 border-t border-[var(--md-border)]">
+                    <button
+                      type="button"
+                      className="w-full py-3 rounded-xl border border-[var(--md-border)] app-text-muted font-semibold text-sm hover:bg-[var(--md-surface-muted)] transition-colors"
                       onClick={() => setGenPhase('idle')}
                     >
                       Modifier les paramètres et réessayer
@@ -1108,26 +1178,25 @@ export default function TicketBadgeEditor() {
         </div>
       )}
 
-      {/* POPUP MODAL DE SECURITE (4CM) */}
       {showWarningModal && pendingAction && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-gray-100 space-y-4">
-            <div className="flex items-center gap-3 text-amber-600">
-              <div className="p-2 bg-amber-50 rounded-xl">
-                <AlertTriangle size={28} />
+        <div className="fixed inset-0 badge-modal-backdrop flex items-center justify-center z-50 p-4">
+          <div className="badge-modal p-6 max-w-md w-full space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600">
+                <AlertTriangle size={26} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-900">Hauteur d'impression critique</h3>
-                <p className="text-xs text-gray-500">Contrôle de conformité de la billetterie</p>
+                <h3 className="font-landing-display text-base app-heading">Hauteur d&apos;impression critique</h3>
+                <p className="text-xs app-text-muted">Contrôle de conformité de la billetterie</p>
               </div>
             </div>
-            
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Avec vos réglages actuels, la hauteur de votre support sur le papier A4 ne fera que <strong className="text-amber-800">{pendingAction.heightMm} mm</strong> (soit moins de 4,0 cm). À cette taille, le QR Code perd en lisibilité mécanique et la découpe manuelle devient risquée.
+
+            <p className="text-xs app-text-muted leading-relaxed">
+              Avec vos réglages actuels, la hauteur de votre support sur le papier A4 ne fera que <strong className="text-amber-700">{pendingAction.heightMm} mm</strong> (soit moins de 4,0 cm). À cette taille, le QR Code perd en lisibilité mécanique et la découpe manuelle devient risquée.
             </p>
 
-            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-[11px] text-gray-500 space-y-1">
-              <span className="font-semibold text-gray-700 block">Solutions recommandées :</span>
+            <div className="badge-tip space-y-1">
+              <span className="font-semibold block">Solutions recommandées</span>
               <ul className="list-disc pl-4 space-y-0.5">
                 <li>Diminuer le nombre de colonnes dans la disposition papier.</li>
                 <li>Utiliser un visuel Canva possédant une hauteur native plus importante.</li>
@@ -1135,22 +1204,24 @@ export default function TicketBadgeEditor() {
             </div>
 
             <div className="flex items-center gap-3 pt-2">
-              <button 
+              <button
+                type="button"
                 onClick={() => {
                   setShowWarningModal(false);
                   setPendingAction(null);
                 }}
-                className="flex-1 py-2 text-xs border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-all"
+                className="flex-1 py-2.5 text-xs border border-[var(--md-border)] app-text-muted rounded-xl hover:bg-[var(--md-surface-muted)] font-semibold transition-all"
               >
                 Ajuster mes réglages
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={() => {
                   if (pendingAction) pendingAction.callback();
                   setShowWarningModal(false);
                   setPendingAction(null);
                 }}
-                className="flex-1 py-2 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-md transition-all"
+                className="flex-1 py-2.5 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-md transition-all"
               >
                 Poursuivre quand même
               </button>

@@ -2383,9 +2383,11 @@ router.post('/generate-tickets', async (req, res) => {
 
     // Phase 3: generate QR codes (data URLs)
     const qrDataUrls = {};
+    const { buildQrColorOptions } = require('../services/ticketPdfLayout');
+    const qrColors = buildQrColorOptions(config || {});
     for (const t of ticketsToInsert) {
       const payload = `${process.env.FRONTEND_URL || 'https://app.local'}/ticket/${t.id}`;
-      const dataUrl = await QRCode.toDataURL(payload, { margin: 0 });
+      const dataUrl = await QRCode.toDataURL(payload, { margin: 0, color: qrColors });
       qrDataUrls[t.id] = dataUrl;
     }
 
@@ -2456,16 +2458,9 @@ router.post('/generate-tickets', async (req, res) => {
     const rowGap = config?.rowGap || 0;
     const colGap = config?.colGap || 0;
 
-    // config.widthMm envoyé par le frontend est la largeur TOTALE (Design + Zone QR)
-    // config.heightMm est la hauteur de la ligne (billet)
-    const totalTicketWmm = config?.widthMm || (support === 'badge' ? 85 : 100);
-    const totalTicketHmm = config?.heightMm || (support === 'badge' ? 54 : 40);
-
-    let qrZoneWmm = 0;
-    if (support === 'ticket') qrZoneWmm = totalTicketHmm; // QR carré à droite
-    else if (support === 'invitation') qrZoneWmm = 50;   // Zone QR fixe de 5cm
-
-    const designWmm = totalTicketWmm - qrZoneWmm;
+    const { parseLayoutConfig, drawTicketOnPage } = require('../services/ticketPdfLayout');
+    const ticketLayout = parseLayoutConfig(config, support);
+    const { totalTicketWmm, totalTicketHmm } = ticketLayout;
 
     let currentPage = null;
     let currentY = A4_HEIGHT_MM - PAGE_MARGIN_MM; // Curseur de position verticale (Haut vers Bas)
@@ -2494,67 +2489,17 @@ router.post('/generate-tickets', async (req, res) => {
       const drawX = mmToPt(currentX);
       const drawY = mmToPt(currentY - totalTicketHmm);
 
-      // 1. Dessiner le design (Fit contain dans sa zone)
-      const designWPt = mmToPt(designWmm);
-      const designHPt = mmToPt(totalTicketHmm);
-      
-      const { width: imgW, height: imgH } = embeddedDesign.scale(1);
-      const scale = Math.min(designWPt / imgW, designHPt / imgH);
-      const dw = imgW * scale;
-      const dh = imgH * scale;
-      
-      currentPage.drawImage(embeddedDesign, {
-        x: drawX + (designWPt - dw) / 2,
-        y: drawY + (designHPt - dh) / 2,
-        width: dw,
-        height: dh
+      await drawTicketOnPage({
+        page: currentPage,
+        pdfDoc,
+        embeddedDesign,
+        qrDataUrl: qrDataUrls[t.id],
+        ticket: t,
+        config,
+        drawX,
+        drawY,
+        mmToPt,
       });
-
-      // 2. Dessiner le QR Code à droite du design
-      if (qrZoneWmm > 0) {
-        const qrBuf = Buffer.from(qrDataUrls[t.id].split(',')[1], 'base64');
-        let qrImage = await pdfDoc.embedPng(qrBuf).catch(() => pdfDoc.embedJpg(qrBuf));
-
-        if (qrImage) {
-            const qrContainerWPt = mmToPt(qrZoneWmm);
-            const qrContainerHPt = designHPt;
-
-            const maxQrSizePt = Math.min(qrContainerWPt - 12, qrContainerHPt * 0.7);
-            const qrSizePt = maxQrSizePt;
-
-            const qx = drawX + designWPt + (qrContainerWPt - qrSizePt) / 2;
-            const qy = drawY + (designHPt - qrSizePt - 6);
-
-            currentPage.drawImage(qrImage, { x: qx, y: qy, width: qrSizePt, height: qrSizePt });
-
-            const { rgb, StandardFonts } = require('pdf-lib');
-            const textFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-            const labelFontSize = 7;
-            
-            const ticketIdDisplay = t.number ? `#${t.number}` : t.id.slice(0, 8);
-            const line1Text = `Ticket N° ${ticketIdDisplay} | ${t.ticket_type || 'Standard'}`;
-            const line2Text = `Made with ToliarEvent`;
-
-            const lx1 = drawX + designWPt + (qrContainerWPt - textFont.widthOfTextAtSize(line1Text, labelFontSize)) / 2;
-            const lx2 = drawX + designWPt + (qrContainerWPt - textFont.widthOfTextAtSize(line2Text, labelFontSize - 1)) / 2;
-
-            currentPage.drawText(line1Text, {
-              x: lx1,
-              y: drawY + 16,
-              size: labelFontSize,
-              font: textFont,
-              color: rgb(0.2, 0.2, 0.2),
-          });
-
-            currentPage.drawText(line2Text, {
-              x: lx2,
-              y: drawY + 6,
-              size: labelFontSize - 1,
-              font: textFont,
-              color: rgb(0.5, 0.5, 0.5),
-            });
-        }
-      }
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -2936,6 +2881,126 @@ router.post('/tickets/bulk-delete', async (req, res) => {
   } catch (error) {
     console.error('Erreur POST tickets/bulk-delete:', error);
     res.status(500).json({ success: false, error: 'Erreur lors de la suppression des billets.' });
+  }
+});
+
+/**
+ * POST /api/auth/tickets/restore-printed
+ * Body: { event_id, tickets: [{ id, number, ticket_type, price?, status? }] }
+ * Ré-enregistre des billets imprimés supprimés par erreur (admin requis).
+ */
+router.post('/tickets/restore-printed', async (req, res) => {
+  try {
+    const access_token = req.headers.authorization?.split('Bearer ')[1];
+    const { event_id, tickets } = req.body;
+
+    if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' });
+    if (!event_id) return res.status(400).json({ success: false, error: 'event_id requis' });
+    if (!Array.isArray(tickets) || tickets.length === 0) {
+      return res.status(400).json({ success: false, error: 'tickets requis (tableau non vide)' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
+    if (authError || !authData.user) {
+      return res.status(401).json({ success: false, error: 'Authentification invalide' });
+    }
+
+    const db = supabase.createClientWithAuth(access_token);
+    const admin = supabase.admin;
+    if (!admin) return res.status(500).json({ success: false, error: 'Admin client non configuré' });
+
+    const { data: eventData, error: eventError } = await db
+      .from('events')
+      .select('organization_id')
+      .eq('id', event_id)
+      .single();
+    if (eventError || !eventData) {
+      return res.status(404).json({ success: false, error: 'Événement introuvable.' });
+    }
+
+    const { data: memberRows } = await db
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', eventData.organization_id)
+      .eq('profile_id', authData.user.id)
+      .limit(1);
+
+    if (!memberRows || memberRows.length === 0 || memberRows[0].role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Accès refusé: administrateur requis.' });
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const now = new Date().toISOString();
+    const restored = [];
+    const skipped = [];
+    const errors = [];
+
+    for (const ticket of tickets) {
+      const id = String(ticket.id || '').trim();
+      const ticketType = String(ticket.ticket_type || '').trim();
+      const number = Number(ticket.number);
+      const price = Number(ticket.price ?? 0);
+      const status = String(ticket.status || 'valid');
+
+      if (!uuidRegex.test(id)) {
+        errors.push({ id, error: 'ID billet invalide' });
+        continue;
+      }
+      if (!ticketType) {
+        errors.push({ id, error: 'Type de billet requis' });
+        continue;
+      }
+      if (!Number.isFinite(number) || number <= 0) {
+        errors.push({ id, error: 'Numéro de billet invalide' });
+        continue;
+      }
+
+      const { data: existing } = await admin.from('tickets').select('id').eq('id', id).maybeSingle();
+      if (existing) {
+        skipped.push({ id, reason: 'already_exists' });
+        continue;
+      }
+
+      const insertPayload = {
+        id,
+        event_id,
+        ticket_type: ticketType,
+        number,
+        price: Number.isFinite(price) ? price : 0,
+        status,
+        holder_name: ticket.holder_name || null,
+        sold_by: null,
+        scanned_by: null,
+        created_at: now,
+        updated_at: now,
+      };
+
+      const { data: inserted, error: insertError } = await admin
+        .from('tickets')
+        .insert(insertPayload)
+        .select('id, number, ticket_type, status')
+        .single();
+
+      if (insertError) {
+        errors.push({ id, error: insertError.message });
+        continue;
+      }
+
+      restored.push(inserted);
+    }
+
+    return res.json({
+      success: true,
+      message: `${restored.length} billet(s) ré-enregistré(s).`,
+      restored,
+      restored_count: restored.length,
+      skipped,
+      skipped_count: skipped.length,
+      errors,
+    });
+  } catch (error) {
+    console.error('Erreur POST tickets/restore-printed:', error);
+    res.status(500).json({ success: false, error: 'Erreur lors du ré-enregistrement des billets.' });
   }
 });
 

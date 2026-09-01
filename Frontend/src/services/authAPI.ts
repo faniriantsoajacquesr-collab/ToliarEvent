@@ -646,6 +646,22 @@ export const authAPI = {
     return response.json();
   },
 
+  async restorePrintedTickets(
+    eventId: string,
+    tickets: Array<{ id: string; number: number; ticket_type: string; price?: number; status?: string }>,
+    accessToken: string
+  ) {
+    const response = await fetch(`${API_URL}/tickets/restore-printed`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ event_id: eventId, tickets }),
+    });
+    return response.json();
+  },
+
   async bulkEventStaffAction(
     applicationIds: number[],
     action: 'accept' | 'reject' | 'delete',

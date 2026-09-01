@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import JournalTAccount from '../components/JournalTAccount';
 import type { Transaction } from '../components/JournalTAccount';
-import LoadingOverlay from '../components/LoadingOverlay';
+import { FinanceSkeleton } from '../components/skeleton';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 
@@ -288,8 +288,9 @@ export default function FinanceManagement() {
 
         {errorMessage ? <div className="mb-md rounded-lg bg-error-container px-md py-sm text-sm text-error">{errorMessage}</div> : null}
 
-        {isLoading && <LoadingOverlay message="Chargement des transactions..." />}
-        {!isLoading && (
+        {isLoading ? (
+          <FinanceSkeleton />
+        ) : (
           <JournalTAccount
             expenses={expenses}
             revenues={revenues}

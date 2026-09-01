@@ -3,6 +3,7 @@ import { API_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 import ProfileModal from './ProfileModal';
+import ThemeToggle from './ThemeToggle';
 
 // 1. Correction du type manquant
 interface DashboardTopBarProps {
@@ -74,7 +75,7 @@ export default function DashboardTopBar({ selectedEvent, onSelectEvent, toggleMo
   }, []);
 
   return (
-    <div className="fixed left-0 right-0 top-0 bg-surface-container-lowest border-b border-outline-variant/30 px-4 py-3 flex items-center justify-between gap-md shadow-sm z-40">
+    <div className="app-topbar fixed left-0 md:left-[var(--sidebar-width)] right-0 top-0 border-b px-4 py-3 flex items-center justify-between gap-md z-40 transition-all duration-300">
       
       {/* SECTION GAUCHE : Hamburger Mobile + Sélecteur d'événement */}
       <div className="flex items-center gap-sm">
@@ -137,6 +138,7 @@ export default function DashboardTopBar({ selectedEvent, onSelectEvent, toggleMo
 
       {/* SECTION DROITE : Notifications, Paramètres et Profil */}
       <div className="flex items-center gap-md">
+        <ThemeToggle />
         <button type="button" className="hover:bg-surface-container rounded-full p-2 text-on-surface-variant transition-colors">
           <span className="material-symbols-outlined">notifications</span>
         </button>

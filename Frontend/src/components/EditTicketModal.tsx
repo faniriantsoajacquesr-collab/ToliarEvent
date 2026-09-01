@@ -3,7 +3,7 @@ import { API_URL } from '../config/api';
 import { normalizeTicketDbStatus } from '../utils/ticketScan';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-
+import { ModalSkeleton } from './skeleton';
 
 interface EditTicketModalProps {
   isOpen: boolean;
@@ -102,7 +102,7 @@ export default function EditTicketModal({ isOpen, onClose, ticketId, eventId, on
       <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
         <h3 className="font-bold text-lg mb-4">Modifier le billet {ticketId}</h3>
         {isLoading ? (
-          <div className="text-center py-8">Chargement des détails du billet...</div>
+          <ModalSkeleton />
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

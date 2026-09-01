@@ -47,7 +47,7 @@ export default function DashboardSidebar({ isCollapsed, onToggle, isMobileSideba
 
   const mobileBase = `fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:hidden`;
   const mobileState = isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full';
-  const desktopBase = `h-full w-[var(--sidebar-width)] fixed left-0 top-0 md:block hidden bg-surface-container-lowest border-r border-outline-variant shadow-sm flex flex-col py-lg px-md z-30 transition-all duration-300 overflow-hidden`;
+  const desktopBase = `h-full w-[var(--sidebar-width)] fixed left-0 top-0 md:block hidden app-sidebar border-r flex flex-col py-lg px-md z-30 transition-all duration-300 overflow-hidden`;
 
   const tabClassName = (tabId: string, collapsed: boolean) => {
     const isActive = activeTab === tabId;
@@ -61,10 +61,10 @@ export default function DashboardSidebar({ isCollapsed, onToggle, isMobileSideba
   return (
     <>
       {/* Mobile off-canvas */}
-      <aside className={`${mobileBase} ${mobileState} bg-surface-container-lowest border-r border-outline-variant shadow-sm flex flex-col py-lg px-md overflow-auto`}>
+      <aside className={`${mobileBase} ${mobileState} app-sidebar border-r flex flex-col py-lg px-md overflow-auto`}>
         <div className="mb-xl flex items-center justify-between">
           <div>
-            <h1 className="text-headline-md font-headline-md font-bold text-primary">ToliarEvent</h1>
+            <h1 className="font-landing-display text-xl font-bold text-primary">ToliarEvent</h1>
           </div>
           <button onClick={() => toggleMobileSidebar?.()} className="p-2 rounded-md">
             <span className="material-symbols-outlined">close</span>
@@ -105,8 +105,8 @@ export default function DashboardSidebar({ isCollapsed, onToggle, isMobileSideba
         <div className="mb-xl flex items-center justify-between">
           {!isCollapsed && (
             <div className="animate-in fade-in duration-500">
-              <h1 className="text-headline-md font-headline-md font-bold text-primary">ToliarEvent</h1>
-              <p className="text-label-md text-on-surface-variant opacity-70">Event Logistics</p>
+              <h1 className="font-landing-display text-xl font-bold text-primary">ToliarEvent</h1>
+              <p className="text-xs app-text-muted">Event Logistics</p>
             </div>
           )}
           <button onClick={onToggle} className={`p-2 hover:bg-surface-container-low rounded-lg text-on-surface-variant transition-colors ${isCollapsed ? 'mx-auto' : ''}`}>

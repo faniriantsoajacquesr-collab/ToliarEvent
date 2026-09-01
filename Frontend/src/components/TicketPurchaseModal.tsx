@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { authAPI } from '../services/authAPI';
 import LegalAcceptanceCheckbox from './LegalAcceptanceCheckbox';
+import { Skeleton } from './skeleton';
 
 import {
 
@@ -830,9 +831,11 @@ export default function TicketPurchaseModal({
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Moyen de paiement *</span>
 
                 {paymentMethodsLoading ? (
-
-                  <p className="text-sm text-slate-500">Chargement des moyens de paiement...</p>
-
+                  <div className="space-y-2" aria-busy="true">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" rounded="xl" />
+                    ))}
+                  </div>
                 ) : paymentMethods.length === 0 ? (
 
                   <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

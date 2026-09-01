@@ -3,8 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 import { useToast } from '../contexts/ToastContext';
 import { User, ShieldCheck, ChevronRight, ChevronLeft, Save, X, Plus } from 'lucide-react';
-
-// Interface pour typer correctement les compétences système
+import { ModalSkeleton } from './skeleton';
 interface SystemSkill {
   id: number;
   name: string;
@@ -157,10 +156,7 @@ export default function ProfileModal({ isOpen, onClose }: { isOpen: boolean; onC
         {/* Contenu du Formulaire */}
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
           {loading && !profile ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 text-sm text-gray-500">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-              Récupération de vos informations...
-            </div>
+            <ModalSkeleton />
           ) : step === 1 ? (
             /* ================= ÉTAPE 1 : INFOS DE BASE ================= */
             <div className="space-y-4">

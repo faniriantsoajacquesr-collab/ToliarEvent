@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { API_URL } from '../config/api';
 import GanttChart from '../components/GanttChart';
-import LoadingOverlay from '../components/LoadingOverlay';
+import { PlanningSkeleton } from '../components/skeleton';
 import type { GanttTask } from '../components/GanttChart';
 import { useAuth } from '../contexts/AuthContext';
 import TaskFormModal from '../components/TaskFormModal';
@@ -344,9 +344,10 @@ export default function PlanningManagement({ selectedEventId }: { selectedEventI
           )}
         </div>
 
-        {isLoading && <LoadingOverlay message="Chargement du planning..." />}
-
-        {/* Search & Filter */}
+        {isLoading ? (
+          <PlanningSkeleton />
+        ) : (
+          <>
         <div className="flex flex-col gap-md">
           <div className="flex justify-between items-center gap-md">
             <div className="relative flex-1 max-w-md">
@@ -450,6 +451,8 @@ export default function PlanningManagement({ selectedEventId }: { selectedEventI
           onClose={() => { setIsDetailsModalOpen(false); setSelectedTask(null); }}
           onUpdated={refreshTasks}
         />
+          </>
+        )}
       </div>
     </>
   );

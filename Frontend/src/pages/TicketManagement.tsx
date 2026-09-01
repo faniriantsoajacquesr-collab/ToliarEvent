@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_URL } from '../config/api';
-import LoadingOverlay from '../components/LoadingOverlay';
+import ProcessingOverlay from '../components/ProcessingOverlay';
+import { InlineListSkeleton } from '../components/skeleton';
 import { useToast } from '../contexts/ToastContext';
 import TicketTable from '../components/TicketTable';
 import BulkGenerationModal from '../components/BulkGenerationModal';
@@ -10,7 +11,9 @@ import EditTicketModal from '../components/EditTicketModal';
 import QrCodeModal from '../components/QrCodeModal';
 import { QrCodeModalScan } from '../components/QrCodeModalScan';
 import TicketNotActivatedModal from '../components/TicketNotActivatedModal';
+import TicketRestoreFromScreenshotModal from '../components/TicketRestoreFromScreenshotModal';
 import TicketTypesManagement from '../components/TicketTypesManagement';
+import AppPageHeader from '../components/AppPageHeader';
 import { authAPI } from '../services/authAPI';
 import { parseTicketIdFromQr, mapTicketDbStatusToUi, sortTicketsByNumberDesc, type TicketScanAction } from '../utils/ticketScan';
 
@@ -29,7 +32,8 @@ interface Ticket {
 }
 
 export default function TicketManagement({ selectedEventId }: { selectedEventId: string | null }) {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
+  const isAdmin = user?.role?.toString().toLowerCase() === 'admin';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'registre' | 'config'>('registre');
@@ -45,6 +49,7 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [scanAction, setScanAction] = useState<TicketScanAction>('use');
   const [isNotActivatedModalOpen, setIsNotActivatedModalOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [isScanProcessing, setIsScanProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -315,217 +320,243 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
 
   return (
     <>
-      {isScanProcessing && <LoadingOverlay message="Traitement du scan..." />}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen space-y-6">
-        <div className="rounded-3xl border border-outline-variant/30 bg-surface p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 rounded-full border border-outline-variant/40 bg-background p-1">
+      {isScanProcessing && <ProcessingOverlay message="Traitement du scan..." />}
+      <main className="dash-page flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-screen">
+        <div className="relative z-10 max-w-container-max mx-auto px-gutter pb-12 pt-24 md:pt-28 space-y-8">
+          <AppPageHeader
+            title="Billetterie"
+            subtitle="Gérez le registre des billets, les scans et la configuration tarifaire de l'événement actif."
+          />
+
+          {/* Tabs */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setActiveTab('registre')}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === 'registre' ? 'border-b-2 border-primary text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+                className={`landing-chip ${activeTab === 'registre' ? 'landing-chip--active' : ''}`}
               >
                 Registre
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('config')}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === 'config' ? 'border-b-2 border-primary text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
+                className={`landing-chip ${activeTab === 'config' ? 'landing-chip--active' : ''}`}
               >
                 Tarifs
               </button>
             </div>
-            <p className="text-sm text-on-surface-variant">Basculez entre le registre opérationnel et la configuration des types de billets.</p>
+            <p className="text-xs app-text-muted max-w-md">
+              Basculez entre le registre opérationnel et la configuration des types de billets.
+            </p>
           </div>
-        </div>
 
         {activeTab === 'registre' ? (
           <>
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">
-                Actions de Billetterie
-              </h3>
+            {/* Quick actions */}
+            <section className="dash-actions-panel">
+              <p className="landing-eyebrow mb-1">Actions rapides</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
-                  className="w-full flex items-center justify-center gap-3 bg-primary text-white px-4 py-4 rounded-xl shadow-sm hover:bg-primary/95 active:scale-[0.99] transition-all group overflow-hidden relative"
+                  type="button"
+                  className="dash-action-card dash-action-card--blue"
                   onClick={() => {
                     if (!selectedEventId) {
                       showToast("Sélectionnez d'abord un événement dans la section 'Événements'", 'error');
                       return;
                     }
-                    const url = `/badge-editor?eventId=${encodeURIComponent(selectedEventId)}`;
-                    window.open(url, '_blank');
+                    window.open(`/badge-editor?eventId=${encodeURIComponent(selectedEventId)}`, '_blank');
                   }}
                 >
-                  <span className="material-symbols-outlined text-xl">confirmation_number</span>
-                  <div className="text-left">
-                    <span className="block text-sm font-bold">Générer des billets</span>
+                  <span className="dash-action-card__icon">
+                    <span className="material-symbols-outlined">confirmation_number</span>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold app-heading">Générer des billets</p>
+                    <p className="text-xs app-text-muted mt-0.5">Impression & badges</p>
                   </div>
+                  <span className="dash-action-card__arrow">arrow_forward</span>
                 </button>
                 <button
-                  className="w-full flex items-center justify-center gap-3 bg-secondary text-white px-4 py-4 rounded-xl shadow-md hover:bg-secondary/95 active:scale-[0.99] transition-all"
+                  type="button"
+                  className="dash-action-card dash-action-card--indigo"
                   onClick={() => handleOpenScanner('activate')}
                 >
-                  <span className="material-symbols-outlined text-xl">point_of_sale</span>
-                  <div className="text-left">
-                    <span className="block text-sm font-bold">Activer un billet</span>
-                    <span className="block text-[11px] opacity-80">Marquer comme vendu</span>
+                  <span className="dash-action-card__icon">
+                    <span className="material-symbols-outlined">point_of_sale</span>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold app-heading">Activer un billet</p>
+                    <p className="text-xs app-text-muted mt-0.5">Marquer comme vendu</p>
                   </div>
+                  <span className="dash-action-card__arrow">arrow_forward</span>
                 </button>
                 <button
-                  className="w-full flex items-center justify-center gap-3 bg-tertiary text-white px-4 py-4 rounded-xl shadow-md hover:bg-tertiary/95 active:scale-[0.99] transition-all"
+                  type="button"
+                  className="dash-action-card dash-action-card--teal"
                   onClick={() => handleOpenScanner('use')}
                 >
-                  <span className="material-symbols-outlined text-xl">qr_code_scanner</span>
-                  <div className="text-left">
-                    <span className="block text-sm font-bold">Scanner un billet</span>
-                    <span className="block text-[11px] opacity-80">Valider l&apos;entrée</span>
+                  <span className="dash-action-card__icon">
+                    <span className="material-symbols-outlined">qr_code_scanner</span>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold app-heading">Scanner un billet</p>
+                    <p className="text-xs app-text-muted mt-0.5">Valider l&apos;entrée</p>
                   </div>
+                  <span className="dash-action-card__arrow">arrow_forward</span>
                 </button>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
-                <div>
-                  <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">Valides / Imprimés</span>
-                  <span className="block text-xl font-bold mt-1">{validTicketsCount.toLocaleString()}</span>
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="dash-action-card dash-action-card--amber w-full"
+                  onClick={() => {
+                    if (!selectedEventId) {
+                      showToast("Sélectionnez d'abord un événement", 'error');
+                      return;
+                    }
+                    setIsRestoreModalOpen(true);
+                  }}
+                >
+                  <span className="dash-action-card__icon">
+                    <span className="material-symbols-outlined">restore_page</span>
+                  </span>
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-bold app-heading">Ré-enregistrer depuis capture</p>
+                    <p className="text-xs app-text-muted mt-0.5">Admin — billets imprimés supprimés par erreur</p>
+                  </div>
+                  <span className="dash-action-card__arrow">arrow_forward</span>
+                </button>
+              )}
+            </section>
+
+            {/* KPIs */}
+            <section>
+              <p className="landing-eyebrow mb-4">Vue d&apos;ensemble</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="dash-stat-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="dash-stat-label mb-1">Valides / Imprimés</p>
+                    <p className="dash-stat-value">{validTicketsCount.toLocaleString()}</p>
+                  </div>
+                  <span className="material-symbols-outlined text-2xl text-primary opacity-80">print</span>
                 </div>
-                <span className="material-symbols-outlined text-primary text-lg bg-primary/5 p-2 rounded-lg">print</span>
+              </div>
+              <div className="dash-stat-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="dash-stat-label mb-1">Billets vendus</p>
+                    <p className="dash-stat-value">{paidTicketsCount.toLocaleString()}</p>
+                  </div>
+                  <span className="material-symbols-outlined text-2xl text-indigo-500 opacity-80">payments</span>
+                </div>
+              </div>
+              <div className="dash-stat-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="dash-stat-label mb-1">Billets scannés</p>
+                    <p className="dash-stat-value">{usedTicketsCount.toLocaleString()}</p>
+                  </div>
+                  <span className="material-symbols-outlined text-2xl text-teal-500 opacity-80">qr_code_scanner</span>
+                </div>
+              </div>
+              </div>
+            </section>
+
+            {/* Registry */}
+            <section className="space-y-5">
+              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                <div>
+                  <p className="landing-eyebrow mb-2">Registre</p>
+                  <h2 className="font-landing-display text-xl app-heading">Registre des billets</h2>
+                </div>
               </div>
 
-              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
-                <div>
-                  <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">Billets Vendus</span>
-                  <span className="block text-xl font-bold mt-1">{paidTicketsCount.toLocaleString()}</span>
+              <div className="dash-toolbar flex-col sm:flex-row">
+                <div className="relative flex-1 min-w-[140px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 app-text-muted text-lg pointer-events-none">filter_list</span>
+                  <select
+                    className="w-full pl-10 pr-8 py-2.5 rounded-xl text-xs font-semibold app-input appearance-none bg-transparent border-0"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                  >
+                    <option value="all">Tous les statuts</option>
+                    <option value="valid">Valide</option>
+                    <option value="paid">Payé</option>
+                    <option value="used">Utilisé</option>
+                  </select>
                 </div>
-                <span className="material-symbols-outlined text-secondary text-lg bg-secondary/5 p-2 rounded-lg">payments</span>
-              </div>
-
-              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
-                <div>
-                  <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">Billets Scannés</span>
-                  <span className="block text-xl font-bold mt-1">{usedTicketsCount.toLocaleString()}</span>
+                <div className="relative flex-1 min-w-[140px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 app-text-muted text-lg pointer-events-none">confirmation_number</span>
+                  <select
+                    className="w-full pl-10 pr-8 py-2.5 rounded-xl text-xs font-semibold app-input appearance-none bg-transparent border-0"
+                    value={filterTicketType}
+                    onChange={(e) => setFilterTicketType(e.target.value)}
+                  >
+                    <option value="all">Tous les types</option>
+                    {typeFilterOptions.map((typeName) => (
+                      <option key={typeName} value={typeName}>{typeName}</option>
+                    ))}
+                  </select>
                 </div>
-                <span className="material-symbols-outlined text-tertiary text-lg bg-tertiary/5 p-2 rounded-lg">qr_code_scanner</span>
-              </div>
-            </div>
-
-            <section className="space-y-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant/20 pb-4">
-                <h2 className="text-lg font-bold text-on-surface">Registre des Billets</h2>
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-                  <div className="relative w-full sm:w-48">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
-                      filter_list
-                    </span>
-                    <select
-                      className="w-full pl-9 pr-8 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs font-semibold appearance-none focus:border-primary focus:outline-none transition-all text-on-surface"
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                    >
-                      <option value="all">Tous les statuts</option>
-                      <option value="valid">Valide</option>
-                      <option value="paid">Payé</option>
-                      <option value="used">Utilisé</option>
-                    </select>
-                  </div>
-
-                  <div className="relative w-full sm:w-48">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
-                      confirmation_number
-                    </span>
-                    <select
-                      className="w-full pl-9 pr-8 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs font-semibold appearance-none focus:border-primary focus:outline-none transition-all text-on-surface"
-                      value={filterTicketType}
-                      onChange={(e) => setFilterTicketType(e.target.value)}
-                    >
-                      <option value="all">Tous les types</option>
-                      {typeFilterOptions.map((typeName) => (
-                        <option key={typeName} value={typeName}>
-                          {typeName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="relative w-full sm:w-64">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
-                      search
-                    </span>
-                    <input
-                      className="w-full pl-9 pr-4 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs focus:border-primary focus:outline-none transition-all text-on-surface"
-                      placeholder="N°, détenteur ou vendeur..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      type="text"
-                    />
-                  </div>
+                <div className="relative flex-[1.2] min-w-[180px]">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 app-text-muted text-lg pointer-events-none">search</span>
+                  <input
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs app-input bg-transparent border-0 focus:outline-none"
+                    placeholder="N°, détenteur ou vendeur…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    type="search"
+                  />
                 </div>
               </div>
 
               {selectedTicketIds.size > 0 && (
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-                  <span className="text-sm font-medium text-primary">
+                <div className="app-card rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-primary/25">
+                  <span className="text-sm font-semibold text-primary">
                     {selectedTicketIds.size} billet{selectedTicketIds.size > 1 ? 's' : ''} sélectionné{selectedTicketIds.size > 1 ? 's' : ''}
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTicketIds(new Set())}
-                      className="rounded-lg border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition"
-                      disabled={isDeleting || isBulkUpdating}
-                    >
+                    <button type="button" onClick={() => setSelectedTicketIds(new Set())} className="landing-btn-secondary !px-3 !py-1.5 !text-xs !rounded-lg" disabled={isDeleting || isBulkUpdating}>
                       Désélectionner
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBulkUpdateStatus('vendu')}
-                      className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-white hover:bg-secondary/90 transition disabled:opacity-50"
-                      disabled={isDeleting || isBulkUpdating}
-                    >
-                      {isBulkUpdating ? 'Traitement...' : 'Marquer vendu'}
+                    <button type="button" onClick={() => handleBulkUpdateStatus('vendu')} className="landing-btn-primary !px-3 !py-1.5 !text-xs !rounded-lg bg-indigo-600" disabled={isDeleting || isBulkUpdating}>
+                      {isBulkUpdating ? 'Traitement…' : 'Marquer vendu'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBulkUpdateStatus('valid')}
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50"
-                      disabled={isDeleting || isBulkUpdating}
-                    >
-                      {isBulkUpdating ? 'Traitement...' : 'Marquer valide'}
+                    <button type="button" onClick={() => handleBulkUpdateStatus('valid')} className="landing-btn-primary !px-3 !py-1.5 !text-xs !rounded-lg bg-emerald-600" disabled={isDeleting || isBulkUpdating}>
+                      {isBulkUpdating ? 'Traitement…' : 'Marquer valide'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleBulkDelete}
-                      className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition disabled:opacity-50"
-                      disabled={isDeleting || isBulkUpdating}
-                    >
-                      {isDeleting ? 'Suppression...' : 'Supprimer la sélection'}
+                    <button type="button" onClick={handleBulkDelete} className="landing-btn-secondary !px-3 !py-1.5 !text-xs !rounded-lg !text-red-600 !border-red-200" disabled={isDeleting || isBulkUpdating}>
+                      {isDeleting ? 'Suppression…' : 'Supprimer'}
                     </button>
                   </div>
                 </div>
               )}
 
-              <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 relative">
-                {isLoading && tickets.length === 0 && (
-                  <LoadingOverlay message="Chargement des billets..." />
+              <div className="relative">
+                {isLoading && tickets.length === 0 ? (
+                  <InlineListSkeleton rows={8} />
+                ) : (
+                  <TicketTable
+                    tickets={filteredTickets}
+                    selectedIds={selectedTicketIds}
+                    onSelectionChange={setSelectedTicketIds}
+                    isRefreshing={isRefreshing || isSearchPending}
+                    onEditTicket={handleEditTicket}
+                    onDeleteTicket={handleDeleteTicket}
+                    onShowQrCode={handleShowQrCode}
+                  />
                 )}
-                <TicketTable
-                  tickets={filteredTickets}
-                  selectedIds={selectedTicketIds}
-                  onSelectionChange={setSelectedTicketIds}
-                  isRefreshing={isRefreshing || isSearchPending}
-                  onEditTicket={handleEditTicket}
-                  onDeleteTicket={handleDeleteTicket}
-                  onShowQrCode={handleShowQrCode}
-                />
               </div>
             </section>
           </>
         ) : (
           <TicketTypesManagement selectedEventId={selectedEventId} />
         )}
-      </div>
+        </div>
+      </main>
 
       <BulkGenerationModal
         isOpen={isModalOpen}
@@ -554,6 +585,14 @@ export default function TicketManagement({ selectedEventId }: { selectedEventId:
       <TicketNotActivatedModal
         isOpen={isNotActivatedModalOpen}
         onClose={() => setIsNotActivatedModalOpen(false)}
+      />
+
+      <TicketRestoreFromScreenshotModal
+        isOpen={isRestoreModalOpen}
+        onClose={() => setIsRestoreModalOpen(false)}
+        eventId={selectedEventId}
+        accessToken={session?.access_token}
+        onRestored={() => fetchTickets(true)}
       />
     </>
   );

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import LoadingOverlay from '../components/LoadingOverlay';
+import { TablePageSkeleton } from '../components/skeleton';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { authAPI } from '../services/authAPI';
@@ -330,6 +330,11 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
 
   return (
     <>
+      {isLoading ? (
+        <div className="flex-1 overflow-y-auto px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen">
+          <TablePageSkeleton rows={6} kpiCount={4} showFilters />
+        </div>
+      ) : (
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen space-y-6">
         <div className="rounded-3xl border border-outline-variant/30 bg-surface p-5 shadow-sm">
           <h2 className="text-lg font-bold text-on-surface">Commandes en ligne</h2>
@@ -639,8 +644,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
           </div>
         </section>
       </div>
-
-      {isLoading && <LoadingOverlay message="Chargement des commandes..." />}
+      )}
     </>
   );
 }

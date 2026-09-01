@@ -1,15 +1,15 @@
 export default function TermsOfServicePage() {
   return (
-    <article className="px-gutter py-xl max-w-3xl mx-auto text-on-background">
+    <article className="px-gutter py-xl max-w-3xl mx-auto">
       <header className="mb-xl">
-        <p className="text-sm text-on-surface-variant mb-sm">Légal</p>
-        <h1 className="font-display-lg text-display-lg text-on-background mb-sm">
+        <p className="landing-eyebrow mb-4">Légal</p>
+        <h1 className="font-landing-display text-3xl landing-heading mb-2">
           Conditions Générales d&apos;Utilisation
         </h1>
-        <p className="text-on-surface-variant">Dernière mise à jour : 03 juillet 2026</p>
+        <p className="landing-text-muted text-sm">Dernière mise à jour : 03 juillet 2026</p>
       </header>
 
-      <div className="space-y-lg font-body-md text-on-surface-variant leading-relaxed">
+      <div className="legal-prose">
         <p>
           L&apos;accès et l&apos;utilisation de l&apos;application ToliarEvent sont soumis à
           l&apos;acceptation sans réserve des présentes Conditions Générales d&apos;Utilisation

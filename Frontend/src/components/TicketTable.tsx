@@ -79,20 +79,20 @@ export default function TicketTable({
   const getTypeColor = (type: string) => {
     const isVip = type.toUpperCase().includes('VIP');
     return isVip
-      ? 'flex items-center gap-xs text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-full border border-amber-100 uppercase tracking-tighter'
-      : 'flex items-center gap-xs text-xs font-medium text-on-surface-variant bg-surface-container px-2 py-1 rounded-full border border-outline-variant/30 uppercase tracking-tighter';
+      ? 'dash-status-badge bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25'
+      : 'dash-status-badge bg-[var(--md-surface-muted)] app-text-muted border border-[var(--md-border)]';
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Utilisé':
-        return 'text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full uppercase tracking-tighter';
+        return 'dash-status-badge bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
       case 'Payé':
-        return 'text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-tighter';
+        return 'dash-status-badge bg-blue-500/15 text-blue-700 dark:text-blue-400';
       case 'Valide':
-        return 'text-xs font-bold text-outline bg-surface-container px-3 py-1 rounded-full uppercase tracking-tighter opacity-70';
+        return 'dash-status-badge bg-[var(--md-surface-muted)] app-text-muted';
       default:
-        return '';
+        return 'dash-status-badge';
     }
   };
 
@@ -104,11 +104,11 @@ export default function TicketTable({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-outline-variant/30 shadow-sm overflow-hidden">
-      <div className="overflow-auto max-h-[500px] custom-scrollbar">
+    <div className="app-card rounded-2xl overflow-hidden">
+      <div className="overflow-auto max-h-[520px] custom-scrollbar">
         <table className="w-full min-w-max text-left border-collapse">
           <thead>
-            <tr className="bg-surface-container-low border-b border-outline-variant/30">
+            <tr className="border-b border-[var(--md-border)] bg-[var(--md-surface-muted)]">
               {selectionEnabled && (
                 <th className="px-md py-md w-10">
                   <input
@@ -123,44 +123,28 @@ export default function TicketTable({
                   />
                 </th>
               )}
-              <th className="px-xl py-md font-label-md text-label-md text-on-surface-variant">
-                N°
-              </th>
-              <th className="px-xl py-md font-label-md text-label-md text-on-surface-variant">
-                Type
-              </th>
-              <th className="px-xl py-md font-label-md text-label-md text-on-surface-variant">
-                Détenteur
-              </th>
-              <th className="px-xl py-md font-label-md text-label-md text-on-surface-variant">
-                Statut
-              </th>
-              <th className="px-xl py-md font-label-md text-label-md text-on-surface-variant">
-                Vendeur
-              </th>
-              <th className="px-xl py-md font-label-md text-label-md text-on-surface-variant">
-                Scanneur
-              </th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">N°</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Type</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Détenteur</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Statut</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Vendeur</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Scanneur</th>
               <th className="px-xl py-md"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-outline-variant/20">
+          <tbody className="divide-y divide-[var(--md-border)]">
             {tickets.length === 0 ? (
               <tr>
-                <td colSpan={selectionEnabled ? 8 : 7} className="px-xl py-8 text-center text-sm text-on-surface-variant">
+                <td colSpan={selectionEnabled ? 8 : 7} className="px-5 py-12 text-center text-sm app-text-muted">
                   Aucun billet trouvé.
                 </td>
               </tr>
             ) : (
-              tickets.map((ticket, idx) => (
+              tickets.map((ticket) => (
                 <tr
                   key={ticket.id}
-                  className={`hover:bg-surface-container-lowest transition-colors group ${
-                    selectionEnabled && selectedIds!.has(ticket.id)
-                      ? 'bg-primary/5'
-                      : idx % 2 === 1
-                        ? 'bg-surface-container-lowest/30'
-                        : ''
+                  className={`hover:bg-[var(--md-surface-muted)]/60 transition-colors group ${
+                    selectionEnabled && selectedIds!.has(ticket.id) ? 'bg-primary/5' : ''
                   }`}
                 >
                   {selectionEnabled && (
@@ -174,11 +158,11 @@ export default function TicketTable({
                       />
                     </td>
                   )}
-                  <td className="px-xl py-md font-mono-sm text-sm text-primary font-medium">
+                  <td className="px-5 py-3.5 font-mono text-sm text-primary font-semibold">
                     {ticket.displayId}
                   </td>
-                  <td className="px-xl py-md">
-                    <span className={getTypeColor(ticket.type)}>
+                  <td className="px-5 py-3.5">
+                    <span className={`inline-flex items-center gap-1 ${getTypeColor(ticket.type)}`}>
                       {ticket.type.toUpperCase().includes('VIP') && (
                         <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                           stars
@@ -187,7 +171,7 @@ export default function TicketTable({
                       {ticket.type}
                     </span>
                   </td>
-                  <td className="px-xl py-md">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-sm">
                       {ticket.holder.avatar ? (
                         <img
@@ -204,45 +188,46 @@ export default function TicketTable({
                           {ticket.holder.initials}
                         </div>
                       )}
-                      <span className="text-sm font-medium">{ticket.holder.name}</span>
+                      <span className="text-sm font-medium app-heading">{ticket.holder.name}</span>
                     </div>
                   </td>
-                  <td className="px-xl py-md">
+                  <td className="px-5 py-3.5">
                     <span className={getStatusColor(ticket.status)}>
                       {ticket.status}
                     </span>
                   </td>
-                  <td className="px-xl py-md text-xs text-on-surface-variant">
+                  <td className="px-5 py-3.5 text-xs app-text-muted">
                     {ticket.sellerName || 'N/A'}
                   </td>
-                  <td className="px-xl py-md text-xs text-on-surface-variant">
+                  <td className="px-5 py-3.5 text-xs app-text-muted">
                     {ticket.scannerName || 'N/A'}
                   </td>
-                  <td className="px-xl py-md text-right relative">
+                  <td className="px-5 py-3.5 text-right relative">
                     <button
-                      className="material-symbols-outlined text-outline opacity-0 group-hover:opacity-100 transition-opacity hover:text-on-surface-variant"
+                      type="button"
+                      className="dash-action-btn rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenDropdownId(openDropdownId === ticket.id ? null : ticket.id);
                       }}
                     >
-                      more_vert
+                      <span className="material-symbols-outlined">more_vert</span>
                     </button>
                     {openDropdownId === ticket.id && (
                       <div
                         ref={dropdownRef}
-                        className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200"
+                        className="app-card absolute right-0 mt-2 w-48 rounded-xl shadow-lg z-10 py-1 overflow-hidden"
                       >
                         <button
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          className="block w-full text-left px-4 py-2.5 text-sm app-heading hover:bg-[var(--md-surface-muted)] transition"
                           onClick={(e) => { e.stopPropagation(); onEditTicket(ticket.id); setOpenDropdownId(null); }}
                         >Modifier</button>
                         <button
-                          className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                          className="block w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-500/10 transition"
                           onClick={(e) => { e.stopPropagation(); onDeleteTicket(ticket.id); setOpenDropdownId(null); }}
                         >Supprimer</button>
                         <button
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          className="block w-full text-left px-4 py-2.5 text-sm app-heading hover:bg-[var(--md-surface-muted)] transition"
                           onClick={(e) => { e.stopPropagation(); onShowQrCode(ticket.id); setOpenDropdownId(null); }}
                         >Afficher QR Code</button>
                       </div>
@@ -255,8 +240,8 @@ export default function TicketTable({
         </table>
       </div>
 
-      <div className="px-xl py-md bg-surface-container-low border-t border-outline-variant/30 flex items-center justify-between gap-3">
-        <p className="text-xs text-on-surface-variant">
+      <div className="px-5 py-3.5 border-t border-[var(--md-border)] bg-[var(--md-surface-muted)]/50 flex items-center justify-between gap-3">
+        <p className="text-xs app-text-muted">
           {tickets.length === 0
             ? 'Aucun billet affiché'
             : `${tickets.length.toLocaleString()} billet${tickets.length > 1 ? 's' : ''} affiché${tickets.length > 1 ? 's' : ''}`}
@@ -264,7 +249,7 @@ export default function TicketTable({
         </p>
         {isRefreshing && (
           <span
-            className="inline-flex items-center gap-1 text-xs text-on-surface-variant"
+            className="inline-flex items-center gap-1 text-xs app-text-muted"
             aria-live="polite"
             aria-label="Mise à jour en cours"
           >

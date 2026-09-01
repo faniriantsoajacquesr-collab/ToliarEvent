@@ -1,7 +1,7 @@
 const fetch = global.fetch || require('node-fetch');
 module.exports = async function generateTickets({ admin, payload, frontendUrl = (process.env.FRONTEND_URL || 'https://app.local') }) {
   const QRCode = require('qrcode');
-  const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+  const { PDFDocument } = require('pdf-lib');
   const { randomUUID } = require('crypto');
 
   const Sharp = (() => {
@@ -52,11 +52,14 @@ module.exports = async function generateTickets({ admin, payload, frontendUrl = 
     // continue with ticketsToInsert
   }
 
+  const { parseLayoutConfig, drawTicketOnPage, buildQrColorOptions } = require('./ticketPdfLayout');
+  const qrColors = buildQrColorOptions(config || {});
+
   // Generate QR codes
   const qrDataUrls = {};
   for (const t of ticketsToInsert) {
     const payloadUrl = `${frontendUrl}/ticket/${t.id}`;
-    const dataUrl = await QRCode.toDataURL(payloadUrl, { margin: 0 });
+    const dataUrl = await QRCode.toDataURL(payloadUrl, { margin: 0, color: qrColors });
     qrDataUrls[t.id] = dataUrl;
   }
 
@@ -98,145 +101,50 @@ module.exports = async function generateTickets({ admin, payload, frontendUrl = 
     }
   }
 
-  // Page and layout config
+  const { parseLayoutConfig, drawTicketOnPage } = require('./ticketPdfLayout');
+
   const A4_WIDTH_MM = 210;
   const A4_HEIGHT_MM = 297;
   const PAGE_MARGIN_MM = 8.4;
 
   const support = config?.supportType || 'ticket';
-  const totalTicketWmm = config?.widthMm || (support === 'badge' ? 85 : 100);
-  const totalTicketHmm = config?.heightMm || (support === 'badge' ? 54 : 40);
+  const cols = config?.layoutOption === '1_col' ? 1 : config?.layoutOption === '2_col' ? 2 : 3;
+  const rowGap = config?.rowGap || 0;
+  const colGap = config?.colGap || 0;
+  const { totalTicketWmm, totalTicketHmm } = parseLayoutConfig(config, support);
 
-  let qrZoneWmm = 0;
-  if (support === 'ticket') qrZoneWmm = totalTicketHmm;
-  else if (support === 'invitation') qrZoneWmm = 50;
-
-  const designWmm = totalTicketWmm - qrZoneWmm;
-
-  const MM_TO_PT = 72 / 25.4;
-  const PAGE_WIDTH = 595.28;
-  const PAGE_HEIGHT = 841.89;
-  const marginX = 16 * MM_TO_PT;
-  const marginY = 16 * MM_TO_PT;
-
-  const usableWidth = PAGE_WIDTH - (2 * marginX);
-  const usableHeight = PAGE_HEIGHT - (2 * marginY);
-
-  const colGapPt = (config.colGap || 0) * MM_TO_PT;
-  const rowGapPt = (config.rowGap || 0) * MM_TO_PT;
-
-  let cols = 1;
-  if (config.layoutOption === '2_col') cols = 2;
-  if (config.layoutOption === '3_col') cols = 3;
-
-  const ticketWPt = mmToPt(totalTicketWmm);
-  const ticketHPt = mmToPt(totalTicketHmm);
-  const containerWidthPt = ticketWPt;
-  const rowHeight = ticketHPt;
-
-  let currentHeightTest = 0;
-  let maxRowsPerPage = 0;
-  const rowStep = rowHeight + rowGapPt;
-
-  while (currentHeightTest + rowHeight <= usableHeight + 0.5) {
-    maxRowsPerPage++;
-    currentHeightTest += rowStep;
-  }
-  maxRowsPerPage = Math.max(1, maxRowsPerPage);
-
-  const maxTicketsPerPage = maxRowsPerPage * cols;
   const tickets = (insertedTickets && insertedTickets.length > 0) ? insertedTickets : ticketsToInsert;
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bgImage = embeddedDesign;
 
   let currentPage = null;
+  let currentY = A4_HEIGHT_MM - PAGE_MARGIN_MM;
 
   for (let i = 0; i < tickets.length; i++) {
+    const colIdx = i % cols;
     const ticket = tickets[i];
-    const pageIndex = i % maxTicketsPerPage;
 
-    if (pageIndex === 0) {
-      currentPage = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    if (colIdx === 0 && i !== 0) {
+      currentY -= (totalTicketHmm + rowGap);
     }
 
-    const currentRow = Math.floor(pageIndex / cols);
-    const currentCol = pageIndex % cols;
-    const drawX = marginX + (currentCol * (containerWidthPt + colGapPt));
-    const drawY = PAGE_HEIGHT - marginY - ((currentRow + 1) * rowHeight) - (currentRow * rowGapPt);
-
-    const qrWidthMm = config.qrContainerMm || (support === 'ticket' ? totalTicketHmm : 50);
-    const qrSize = qrWidthMm * MM_TO_PT;
-    const qrX = drawX + containerWidthPt - qrSize - (4 * MM_TO_PT);
-    const qrY = drawY + (rowHeight - qrSize) / 2;
-    const designAreaWidthPt = Math.max(0, containerWidthPt - qrSize - (4 * MM_TO_PT));
-
-    if (bgImage) {
-      currentPage.drawImage(bgImage, {
-        x: drawX,
-        y: drawY,
-        width: designAreaWidthPt,
-        height: rowHeight,
-      });
-    } else {
-      currentPage.drawRectangle({
-        x: drawX,
-        y: drawY,
-        width: designAreaWidthPt,
-        height: rowHeight,
-        color: rgb(0.95, 0.95, 0.95),
-      });
+    if (!currentPage || (currentY - totalTicketHmm) < PAGE_MARGIN_MM) {
+      currentPage = pdfDoc.addPage([mmToPt(A4_WIDTH_MM), mmToPt(A4_HEIGHT_MM)]);
+      currentY = A4_HEIGHT_MM - PAGE_MARGIN_MM;
     }
 
-    const qrBuffer = await QRCode.toBuffer(ticket.qr_code_url || `${frontendUrl}/ticket/${ticket.id}`, {
-      margin: 1,
-      width: Math.round(qrSize * 1.5)
-    });
-    const qrImage = await pdfDoc.embedPng(qrBuffer);
+    const currentX = PAGE_MARGIN_MM + (colIdx * (totalTicketWmm + colGap));
+    const drawX = mmToPt(currentX);
+    const drawY = mmToPt(currentY - totalTicketHmm);
 
-    currentPage.drawImage(qrImage, {
-      x: qrX,
-      y: qrY,
-      width: qrSize,
-      height: qrSize,
-    });
-
-    const labelFontSize = 10;
-    const textPaddingLeftPt = 6 * MM_TO_PT;
-    const availableTextWidthPt = qrX - drawX - textPaddingLeftPt - (2 * MM_TO_PT);
-
-    const line1Text = payload.ticket_type ? payload.ticket_type.toUpperCase() : 'STANDARD';
-    const line2Text = `N° ${String(ticket.number).padStart(4, '0')}`;
-
-    const truncateToWidth = (f, size, str, maxW) => {
-      if (f.widthOfTextAtSize(str, size) <= maxW) return str;
-      let s = str;
-      while (s.length > 0 && f.widthOfTextAtSize(s + '…', size) > maxW) {
-        s = s.slice(0, -1);
-      }
-      return s.length === 0 ? '…' : s + '…';
-    };
-
-    const safeLine1 = truncateToWidth(font, labelFontSize, line1Text, availableTextWidthPt);
-    const safeLine2 = truncateToWidth(font, labelFontSize - 1, line2Text, availableTextWidthPt);
-
-    const textX = drawX + textPaddingLeftPt;
-    const line1Y = drawY + (rowHeight * 0.5);
-    const line2Y = line1Y - (labelFontSize + 4);
-
-    currentPage.drawText(safeLine1, {
-      x: textX,
-      y: line1Y,
-      size: labelFontSize,
-      font: font,
-      color: rgb(0.1, 0.1, 0.1),
-    });
-
-    currentPage.drawText(safeLine2, {
-      x: textX,
-      y: line2Y,
-      size: labelFontSize - 1,
-      font: font,
-      color: rgb(0.4, 0.4, 0.4),
+    await drawTicketOnPage({
+      page: currentPage,
+      pdfDoc,
+      embeddedDesign,
+      qrDataUrl: qrDataUrls[ticket.id],
+      ticket,
+      config,
+      drawX,
+      drawY,
+      mmToPt,
     });
   }
 

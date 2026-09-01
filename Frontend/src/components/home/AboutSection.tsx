@@ -1,134 +1,172 @@
+import RevealOnScroll from './RevealOnScroll';
+
+type Feature = {
+  phase: string;
+  phaseColor: string;
+  icon: string;
+  iconBg: string;
+  title: string;
+  description: string;
+  bullets: { icon: string; text: string }[];
+  span?: string;
+  delay?: number;
+};
+
+const FEATURES: Feature[] = [
+  {
+    phase: 'Avant l\'événement',
+    phaseColor: 'text-blue-500 dark:text-blue-400',
+    icon: 'group',
+    iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    title: 'Staff et rôles centralisés',
+    description:
+      'Profils, compétences et rôles assignés — vendeur, scanneur, technique — dans un seul registre.',
+    bullets: [
+      { icon: 'check_circle', text: 'Listing bénévoles, prestataires et staff' },
+      { icon: 'badge', text: 'Attribution de rôles par événement' },
+    ],
+    span: 'lg:col-span-2',
+    delay: 0,
+  },
+  {
+    phase: 'Avant l\'événement',
+    phaseColor: 'text-violet-500 dark:text-violet-400',
+    icon: 'event_upcoming',
+    iconBg: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+    title: 'Jalons et préparation',
+    description:
+      'Suivez l\'avancement par pôles logistiques avec des barres de progression en temps réel.',
+    bullets: [
+      { icon: 'trending_up', text: 'Suivi des préparatifs (son, scène, accès)' },
+      { icon: 'timeline', text: 'Phases Avant · Jour J · Après' },
+    ],
+    delay: 80,
+  },
+  {
+    phase: 'Jour J',
+    phaseColor: 'text-cyan-600 dark:text-cyan-400',
+    icon: 'confirmation_number',
+    iconBg: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+    title: 'Billetterie bulk sécurisée',
+    description:
+      'Générez des milliers de tickets QR uniques, prêts pour l\'impression ou la vente numérique.',
+    bullets: [
+      { icon: 'qr_code_2', text: 'UUID/QR unique par billet (Standard, VIP, Invité)' },
+      { icon: 'print', text: 'Export optimisé pour impression' },
+    ],
+    span: 'lg:col-span-2',
+    delay: 160,
+  },
+  {
+    phase: 'Jour J',
+    phaseColor: 'text-rose-500 dark:text-rose-400',
+    icon: 'verified_user',
+    iconBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    title: 'Anti-fraude à l\'entrée',
+    description:
+      'Chaque scan verrouille le billet. Les doublons sont bloqués immédiatement à la porte.',
+    bullets: [
+      { icon: 'lock', text: 'Cycle Validé → Payé → Utilisé' },
+      { icon: 'security', text: 'Blocage instantané des entrées frauduleuses' },
+    ],
+    delay: 240,
+  },
+  {
+    phase: 'Après l\'événement',
+    phaseColor: 'text-amber-600 dark:text-landing-gold',
+    icon: 'calculate',
+    iconBg: 'bg-amber-500/10 text-amber-600 dark:text-landing-gold',
+    title: 'Comptabilité en direct',
+    description:
+      'CA, dépenses, bénéfices et performance par vendeur — sans calculs manuels ni tableurs.',
+    bullets: [
+      { icon: 'insights', text: 'Tableau de bord financier live' },
+      { icon: 'receipt_long', text: 'Frais logistiques avec justificatifs' },
+      { icon: 'leaderboard', text: 'Bilan de caisse par vendeur' },
+    ],
+    span: 'lg:col-span-3',
+    delay: 320,
+  },
+];
+
 export default function AboutSection() {
   return (
-    <section id="a-propos" className="py-24 px-gutter max-w-container-max mx-auto scroll-mt-28">
-      <div className="text-center mb-20">
-        <h2 className="font-display-lg text-display-lg text-on-background mb-md">
-          La Solution Locale
-        </h2>
-        <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">
-          Une plateforme intégrée pour transformer la complexité logistique
-          en excellence opérationnelle.
-        </p>
-      </div>
+    <section
+      id="a-propos"
+      className="landing-section landing-section-surface scroll-mt-28 relative"
+      aria-labelledby="about-heading"
+    >
+      <div
+        className="absolute inset-0 opacity-40 dark:opacity-30 pointer-events-none"
+        aria-hidden="true"
+        style={{
+          background:
+            'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(99,102,241,0.12) 0%, transparent 60%)',
+        }}
+      />
 
-      <div className="gap-lg flex flex-wrap justify-center">
-        <div className="bg-white rounded-[32px] p-xl border border-outline-variant/50 hover:shadow-xl transition-shadow flex flex-col h-full w-full md:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)]">
-          <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-lg">
-            <span className="material-symbols-outlined text-[32px]">group</span>
-          </div>
-          <h3 className="font-headline-lg text-headline-lg mb-md text-on-background">
-            Gestion Intelligente du Staff (Logistique RH)
-          </h3>
-          <p className="font-body-md text-on-surface-variant mb-lg flex-grow">
-            Centralisez les profils et les compétences pour une organisation sans failles.
-            Fini le chaos des groupes WhatsApp, passez à une gestion structurée.
+      <div className="landing-container relative">
+        <RevealOnScroll className="max-w-2xl mb-16 md:mb-24">
+          <p className="landing-eyebrow mb-5">Fonctionnalités</p>
+          <h2
+            id="about-heading"
+            className="font-landing-display text-3xl md:text-5xl lg:text-6xl leading-[1.05] tracking-tight mb-6 landing-heading"
+          >
+            Tout le cycle événementiel,
+            <br />
+            <span className="landing-gradient-text">d&apos;un seul endroit</span>
+          </h2>
+          <p className="landing-text-muted text-lg leading-relaxed">
+            Organisé par phase réelle — avant, pendant et après — parce que vos besoins
+            changent à chaque étape.
           </p>
-          <div className="space-y-sm bg-surface-container-low p-md rounded-xl">
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-primary text-[18px]">check_circle</span>
-              Listing centralisé (Bénévoles, Prestataires, Staff)
-            </div>
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-primary text-[18px]">check_circle</span>
-              Attribution de rôles : Vendeur, Scanneur, Technique
-            </div>
-          </div>
-        </div>
+        </RevealOnScroll>
 
-        <div className="bg-white rounded-[32px] p-xl border border-outline-variant/50 hover:shadow-xl transition-shadow flex flex-col h-full w-full md:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)]">
-          <div className="w-14 h-14 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center mb-lg">
-            <span className="material-symbols-outlined text-[32px]">event_upcoming</span>
-          </div>
-          <h3 className="font-headline-lg text-headline-lg mb-md text-on-background">
-            Suivi Dynamique par Jalons (Gestion de Projet)
-          </h3>
-          <p className="font-body-md text-on-surface-variant mb-lg flex-grow">
-            Agissez comme un chef d'orchestre avec une visibilité totale sur l'avancement.
-            Surveillez les 3 étapes clés : Avant, Jour J, et Après.
-          </p>
-          <div className="space-y-sm bg-surface-container-low p-md rounded-xl">
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-secondary text-[18px]">trending_up</span>
-              Suivi en temps réel des préparatifs (ex: Installation Son)
-            </div>
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-secondary text-[18px]">trending_up</span>
-              Barres de progression par pôles logistiques
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-[32px] p-xl border border-outline-variant/50 hover:shadow-xl transition-shadow flex flex-col h-full w-full md:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)]">
-          <div className="w-14 h-14 bg-tertiary/10 text-tertiary rounded-2xl flex items-center justify-center mb-lg">
-            <span className="material-symbols-outlined text-[32px]">confirmation_number</span>
-          </div>
-          <h3 className="font-headline-lg text-headline-lg mb-md text-on-background">
-            Billetterie Physique Sécurisée (Génération Bulk)
-          </h3>
-          <p className="font-body-md text-on-surface-variant mb-lg flex-grow">
-            Réinventez le ticket papier avec une sécurité numérique de pointe.
-            Générez massivement des milliers de tickets uniques prêts à l'impression.
-          </p>
-          <div className="space-y-sm bg-surface-container-low p-md rounded-xl">
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-tertiary text-[18px]">qr_code_2</span>
-              Génération UUID/QR Code unique (Standard, VIP, Invit)
-            </div>
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-tertiary text-[18px]">print</span>
-              Export optimisé pour impression haute sécurité
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-[32px] p-xl border border-outline-variant/50 hover:shadow-xl transition-shadow flex flex-col h-full w-full md:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)]">
-          <div className="w-14 h-14 bg-error-container/20 text-error rounded-2xl flex items-center justify-center mb-lg">
-            <span className="material-symbols-outlined text-[32px]">verified_user</span>
-          </div>
-          <h3 className="font-headline-lg text-headline-lg mb-md text-on-background">
-            Traçabilité et Cycle de Vie (Sécurité Anti-Fraude)
-          </h3>
-          <p className="font-body-md text-on-surface-variant mb-lg flex-grow">
-            Sécurisez vos revenus financiers et verrouillez les accès.
-            Suivez l'état exact de chaque billet pour empêcher le vol et la fraude.
-          </p>
-          <div className="space-y-sm bg-surface-container-low p-md rounded-xl">
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-error text-[18px]">lock</span>
-              Cycle de vie : Validé → Payé (Vente) → Utilisé (Porte)
-            </div>
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-error text-[18px]">security</span>
-              Blocage immédiat des entrées en cas de doublon
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-[32px] p-xl border border-outline-variant/50 hover:shadow-xl transition-shadow flex flex-col h-full w-full md:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)]">
-          <div className="w-14 h-14 bg-surface-container-highest/20 text-on-surface-variant rounded-2xl flex items-center justify-center mb-lg">
-            <span className="material-symbols-outlined text-[32px]">calculate</span>
-          </div>
-          <h3 className="font-headline-lg text-headline-lg mb-md text-on-background">
-            Comptabilité Automatisée & Chiffres Clés
-          </h3>
-          <p className="font-body-md text-on-surface-variant mb-lg flex-grow">
-            Fini le stress des calculs manuels. L'application centralise les flux financiers
-            en temps réel pour une gestion sereine.
-          </p>
-          <div className="space-y-sm bg-surface-container-low p-md rounded-xl">
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-primary text-[18px]">insights</span>
-              Tableau de bord financier en direct (CA, Bénéfices, Dépenses)
-            </div>
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-primary text-[18px]">receipt_long</span>
-              Enregistrement des frais logistiques avec justificatifs
-            </div>
-            <div className="flex items-center gap-sm text-sm font-medium text-on-surface">
-              <span className="material-symbols-outlined text-primary text-[18px]">leaderboard</span>
-              Classement de performance et bilan de caisse par vendeur
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+          {FEATURES.map((feature) => (
+            <RevealOnScroll
+              key={feature.title}
+              delay={feature.delay}
+              direction="scale"
+              className={feature.span ?? ''}
+            >
+              <article className="landing-bento-card h-full group">
+                <p className={`text-[10px] font-bold uppercase tracking-[0.15em] mb-5 ${feature.phaseColor}`}>
+                  {feature.phase}
+                </p>
+                <div
+                  className={`w-11 h-11 ${feature.iconBg} rounded-xl flex items-center justify-center mb-5
+                    group-hover:scale-110 transition-transform duration-300`}
+                >
+                  <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
+                    {feature.icon}
+                  </span>
+                </div>
+                <h3 className="font-landing-display text-xl md:text-2xl landing-heading mb-3 leading-snug">
+                  {feature.title}
+                </h3>
+                <p className="landing-text-muted text-sm leading-relaxed mb-5 flex-grow">
+                  {feature.description}
+                </p>
+                <ul className="space-y-2.5 pt-4 border-t border-[var(--landing-border)]">
+                  {feature.bullets.map((bullet) => (
+                    <li
+                      key={bullet.text}
+                      className="flex items-start gap-2.5 text-sm landing-text-muted"
+                    >
+                      <span
+                        className="material-symbols-outlined text-primary text-[15px] mt-0.5 shrink-0"
+                        aria-hidden="true"
+                      >
+                        {bullet.icon}
+                      </span>
+                      {bullet.text}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </RevealOnScroll>
+          ))}
         </div>
       </div>
     </section>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import LoadingOverlay from '../components/LoadingOverlay';
+import { CardListSkeleton } from '../components/skeleton';
 import { authAPI } from '../services/authAPI';
 
 interface Application {
@@ -58,10 +58,17 @@ export default function AdminApplications() {
 
       {error && <div className="p-md bg-error-container text-on-error-container rounded-lg mb-md">{error}</div>}
 
-      {loading && <LoadingOverlay message="Chargement des candidatures..." />}
+      {loading && applications.length === 0 ? (
+        <CardListSkeleton count={3} />
+      ) : null}
 
-      {!loading && applications.length === 0 && <div className="text-on-surface-variant">Aucune candidature en attente</div>}
+      {!loading && applications.length === 0 && !error && eventId && (
+        <div className="text-on-surface-variant">Aucune candidature en attente</div>
+      )}
 
+      {loading && applications.length > 0 ? (
+        <CardListSkeleton count={applications.length} />
+      ) : (
       <div className="grid gap-md">
         {applications.map(app => (
           <div key={app.id} className="p-md border rounded-lg bg-surface-container-low">
@@ -89,6 +96,7 @@ export default function AdminApplications() {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

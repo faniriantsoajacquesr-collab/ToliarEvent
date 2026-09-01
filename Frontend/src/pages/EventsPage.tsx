@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { API_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import EventModal from '../components/EventModal';
-import LoadingOverlay from '../components/LoadingOverlay';
+import { EventsGridSkeleton } from '../components/skeleton';
 
 interface Post {
   id: string;
@@ -47,7 +47,7 @@ export default function EventsPage() {
 
   const isAdmin = user?.role === 'admin';
 
-  if (loading) return <LoadingOverlay message="Chargement des événements..." />;
+  if (loading) return <EventsGridSkeleton />;
 
   return (
     <div className="p-gutter max-w-container-max mx-auto mt-20">

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/authAPI';
 import { useAuth } from '../contexts/AuthContext';
 import { resolveAppEntryPath } from '../utils/appRouting';
+import AuthShell from '../components/AuthShell';
+import OnboardingLayout from '../components/OnboardingLayout';
 
 interface ProfileFormData {
   first_name: string;
@@ -23,7 +25,6 @@ export default function CompleteProfilePage() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    // Récupérer l'utilisateur depuis localStorage
     const userData = localStorage.getItem('user');
     if (userData) {
       setUser(JSON.parse(userData));
@@ -72,7 +73,6 @@ export default function CompleteProfilePage() {
         return;
       }
 
-      // Créer le profil utilisateur
       const profileData = await authAPI.createProfile(
         {
           first_name: formData.first_name,
@@ -87,16 +87,6 @@ export default function CompleteProfilePage() {
         return;
       }
 
-      // Mettre à jour le user dans localStorage avec les données du profil créé
-      const updatedUser = {
-        ...user,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        phone: formData.phone || null,
-      };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-
-      // Synchroniser l'état global (hasProfile / hasOrganization) avant la navigation
       const result = await checkProfileCompletion(accessToken);
       navigate(resolveAppEntryPath({
         hasProfile: true,
@@ -112,23 +102,14 @@ export default function CompleteProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-light to-primary flex items-center justify-center p-md">
-      <div className="w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-lg p-xl border border-outline-variant">
-        {/* Header */}
-        <div className="text-center mb-xl">
-          <h1 className="text-headline-md font-bold text-primary mb-sm">Compléter votre profil</h1>
-          <p className="text-label-md text-on-surface-variant">
-            Bienvenue {user?.email}!
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-lg">
-          {/* First Name */}
+    <OnboardingLayout>
+      <AuthShell
+        title="Compléter votre profil"
+        subtitle={user?.email ? `Bienvenue ${user.email}` : 'Quelques informations pour commencer'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="first_name" className="block text-label-md font-semibold text-on-surface mb-sm">
-              Prénom
-            </label>
+            <label htmlFor="first_name" className="app-label">Prénom</label>
             <input
               id="first_name"
               type="text"
@@ -137,15 +118,12 @@ export default function CompleteProfilePage() {
               onChange={handleInputChange}
               placeholder="Jean"
               required
-              className="w-full px-md py-sm rounded-lg border border-outline-variant bg-surface-container-low text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+              className="app-input"
             />
           </div>
 
-          {/* Last Name */}
           <div>
-            <label htmlFor="last_name" className="block text-label-md font-semibold text-on-surface mb-sm">
-              Nom
-            </label>
+            <label htmlFor="last_name" className="app-label">Nom</label>
             <input
               id="last_name"
               type="text"
@@ -154,15 +132,12 @@ export default function CompleteProfilePage() {
               onChange={handleInputChange}
               placeholder="Dupont"
               required
-              className="w-full px-md py-sm rounded-lg border border-outline-variant bg-surface-container-low text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+              className="app-input"
             />
           </div>
 
-          {/* Phone (Optional) */}
           <div>
-            <label htmlFor="phone" className="block text-label-md font-semibold text-on-surface mb-sm">
-              Téléphone (optionnel)
-            </label>
+            <label htmlFor="phone" className="app-label">Téléphone (optionnel)</label>
             <input
               id="phone"
               type="tel"
@@ -170,34 +145,31 @@ export default function CompleteProfilePage() {
               value={formData.phone}
               onChange={handleInputChange}
               placeholder="+261 XX XXX XXX"
-              className="w-full px-md py-sm rounded-lg border border-outline-variant bg-surface-container-low text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition"
+              className="app-input"
             />
           </div>
 
-          {/* Error Message */}
           {error && (
-            <div className="p-md bg-error-container rounded-lg border border-error text-on-error-container text-label-md">
+            <div className="p-3 rounded-xl bg-error-container/80 border border-error text-on-error-container text-sm">
               {error}
             </div>
           )}
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-primary text-white px-lg py-md rounded-lg font-semibold hover:bg-primary-container active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full landing-btn-primary !rounded-xl justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Enregistrement...' : 'Continuer'}
           </button>
         </form>
 
-        {/* Info Box */}
-        <div className="mt-xl p-md bg-primary-container/20 rounded-lg border border-primary/30">
-          <p className="text-label-md text-on-surface">
-            <span className="font-semibold">Note:</span> Ces informations peuvent être modifiées ultérieurement dans les paramètres de votre profil.
+        <div className="mt-6 p-4 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-glass-bg)]">
+          <p className="text-sm landing-text-muted">
+            <span className="font-semibold landing-heading">Note:</span> Ces informations peuvent être modifiées ultérieurement dans les paramètres de votre profil.
           </p>
         </div>
-      </div>
-    </div>
+      </AuthShell>
+    </OnboardingLayout>
   );
 }

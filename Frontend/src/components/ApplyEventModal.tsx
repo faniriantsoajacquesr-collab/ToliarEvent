@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { authAPI } from '../services/authAPI';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { InlineListSkeleton } from './skeleton';
 
 interface ApplyEventModalProps {
   isOpen: boolean;
@@ -90,7 +91,7 @@ export default function ApplyEventModal({ isOpen, onClose, onApplied }: ApplyEve
 
         <div className="max-h-64 overflow-auto space-y-2 mb-md">
           {loading ? (
-            <div className="text-center py-6">Chargement...</div>
+            <InlineListSkeleton rows={4} />
           ) : filtered.length === 0 ? (
             <div className="text-center py-6 text-on-surface-variant">Aucun événement trouvé</div>
           ) : (

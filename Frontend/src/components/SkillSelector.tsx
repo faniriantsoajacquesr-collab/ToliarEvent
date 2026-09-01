@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from '../config/api';
+import { Skeleton } from './skeleton';
 
 export interface Skill {
   id: number;
@@ -66,11 +67,10 @@ export default function SkillSelector({
 
   if (fetchLoading) {
     return (
-      <div className="flex items-center justify-center py-xl">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-outline-variant border-t-primary rounded-full animate-spin mx-auto mb-md"></div>
-          <p className="text-label-md text-on-surface-variant">Chargement des compétences...</p>
-        </div>
+      <div className="flex flex-wrap gap-2 py-4" aria-busy="true" aria-label="Chargement des compétences">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-9 w-24" rounded="full" />
+        ))}
       </div>
     );
   }

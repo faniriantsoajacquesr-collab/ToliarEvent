@@ -4,6 +4,7 @@ import PublicationTemplate, { type TicketCard } from '../components/PublicationT
 import TicketPurchaseModal, { type SelectedTicketType } from '../components/TicketPurchaseModal';
 import { authAPI } from '../services/authAPI';
 import { setDocumentTitle } from '../utils/pageTitles';
+import { PublicEventLandingSkeleton } from '../components/skeleton';
 
 const defaultData = {
   title: 'Événement à Toliara',
@@ -145,24 +146,18 @@ export default function EventLandingPage() {
   }, [eventData]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
-        <div className="rounded-3xl bg-white shadow-lg border border-slate-200 px-8 py-10 text-center">
-          <div className="animate-pulse text-slate-500">Chargement de la page d’événement…</div>
-        </div>
-      </div>
-    );
+    return <PublicEventLandingSkeleton />;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-6 gap-6">
-        <div className="rounded-3xl bg-white shadow-lg border border-slate-200 p-10 text-center max-w-xl">
-          <h1 className="text-2xl font-bold mb-4">Erreur de chargement</h1>
-          <p className="text-slate-600 mb-6">{error}</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 gap-6">
+        <div className="landing-empty-state max-w-xl">
+          <h1 className="font-landing-display text-2xl landing-heading mb-4">Erreur de chargement</h1>
+          <p className="landing-text-muted mb-6">{error}</p>
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white hover:bg-blue-700 transition"
+            className="landing-btn-primary !rounded-xl"
             onClick={() => navigate('/evenements')}
           >
             Retour à la liste des événements
@@ -174,13 +169,13 @@ export default function EventLandingPage() {
 
   if (!eventData) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-6 gap-6">
-        <div className="rounded-3xl bg-white shadow-lg border border-slate-200 p-10 text-center max-w-xl">
-          <h1 className="text-2xl font-bold mb-4">Événement introuvable</h1>
-          <p className="text-slate-600 mb-6">L'événement demandé n'existe pas.</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 gap-6">
+        <div className="landing-empty-state max-w-xl">
+          <h1 className="font-landing-display text-2xl landing-heading mb-4">Événement introuvable</h1>
+          <p className="landing-text-muted mb-6">L&apos;événement demandé n&apos;existe pas.</p>
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white hover:bg-blue-700 transition"
+            className="landing-btn-primary !rounded-xl"
             onClick={() => navigate('/evenements')}
           >
             Retour à la liste des événements
@@ -203,11 +198,11 @@ export default function EventLandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="max-w-8xl mx-auto px-4 py-8">
+    <div className="landing-page min-h-screen">
+      <div className="landing-container py-8">
         <button
           type="button"
-          className="mb-8 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-100 transition"
+          className="mb-8 landing-btn-secondary !rounded-full inline-flex items-center gap-2 !px-4 !py-3 !text-sm"
           onClick={() => navigate('/evenements')}
         >
           <span className="material-symbols-outlined text-base">arrow_back</span>

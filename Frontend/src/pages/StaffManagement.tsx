@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import LoadingOverlay from '../components/LoadingOverlay';
+import { TablePageSkeleton } from '../components/skeleton';
 import StaffTable from '../components/StaffTable';
 import StaffModal from '../components/StaffModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -441,8 +441,9 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
           )}
 
           {/* Staff Table */}
-          {isLoading && <LoadingOverlay message="Chargement des membres du staff..." />}
-          {!isLoading && (
+          {isLoading ? (
+            <TablePageSkeleton rows={8} showFilters />
+          ) : (
             <StaffTable
               staffData={filteredStaff}
               selectedIds={selectedStaffIds}

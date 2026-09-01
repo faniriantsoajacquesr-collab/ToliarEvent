@@ -145,7 +145,7 @@ export default function Dashboard() {
   console.log(handleLogoutClick);
 
   return ( 
-    <div className="min-h-screen bg-background flex" style={{ '--sidebar-width': isSidebarCollapsed ? '72px' : '240px' } as React.CSSProperties}>
+    <div className="app-shell flex" style={{ '--sidebar-width': isSidebarCollapsed ? '72px' : '240px' } as React.CSSProperties}>
       <DashboardSidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}

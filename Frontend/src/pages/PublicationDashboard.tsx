@@ -1,23 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
-
-interface PublicationSummary {
-  eventId: string;
-  eventTitle: string;
-  heroTitle: string;
-  heroImage: string;
-  isPublished: boolean;
-  updatedAt?: string | null;
-}
+import AppPageHeader from '../components/AppPageHeader';
+import PublicationPanel, { type PublicationData } from '../components/PublicationPanel';
+import { PublicationPanelSkeleton } from '../components/skeleton';
 
 export default function PublicationDashboard({ selectedEventId }: { selectedEventId?: string | null }) {
   const navigate = useNavigate();
   const { session } = useAuth();
-  const [publications, setPublications] = useState<PublicationSummary[]>([]);
+  const [publications, setPublications] = useState<PublicationData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
+  const [isToggling, setIsToggling] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -35,7 +30,7 @@ export default function PublicationDashboard({ selectedEventId }: { selectedEven
 
         const res = await authAPI.getEventLandingPages(orgRes.organization.id, session.access_token);
         if (!res.success) {
-          setError('Impossible de charger les publications.');
+          setError('Impossible de charger la publication.');
           return;
         }
 
@@ -51,120 +46,99 @@ export default function PublicationDashboard({ selectedEventId }: { selectedEven
     load();
   }, [session]);
 
+  const activePublication = useMemo(
+    () => publications.find((p) => p.eventId === selectedEventId) ?? null,
+    [publications, selectedEventId]
+  );
+
   const handleTogglePublish = async (eventId: string, currentValue: boolean) => {
     if (!session?.access_token) return;
 
+    setIsToggling(true);
+    setError('');
+
     try {
-      const response = await authAPI.setEventLandingPagePublished(eventId, !currentValue, session.access_token);
+      const response = await authAPI.setEventLandingPagePublished(
+        eventId,
+        !currentValue,
+        session.access_token
+      );
       if (!response.success) {
-        setError('Impossible de modifier le statut de publication.');
+        setError('Impossible de modifier la visibilité de la page.');
         return;
       }
 
-      setPublications((prev) => prev.map((publication) => (
-        publication.eventId === eventId ? { ...publication, isPublished: !currentValue } : publication
-      )));
+      setPublications((prev) =>
+        prev.map((publication) =>
+          publication.eventId === eventId
+            ? { ...publication, isPublished: !currentValue, updatedAt: new Date().toISOString() }
+            : publication
+        )
+      );
     } catch (err) {
       console.error('PublicationDashboard publish error', err);
-      setError('Une erreur est survenue lors de la modification du statut.');
+      setError('Une erreur est survenue lors de la modification.');
+    } finally {
+      setIsToggling(false);
     }
   };
 
-  return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8">
-      <div className="mb-8 flex flex-col gap-3">
-        <div className="rounded-3xl border border-outline-variant bg-surface p-6 shadow-sm">
-          <h1 className="text-headline-lg font-bold text-on-surface">Publication</h1>
-          <p className="mt-2 text-body-md text-on-surface-variant">
-            Gérez les landing pages d’événements et éditez la version publiée de chaque événement.
-          </p>
-        </div>
-      </div>
+  if (loading) {
+    return <PublicationPanelSkeleton />;
+  }
 
-      {loading ? (
-        <div className="rounded-3xl border border-outline-variant bg-surface p-6 text-body-md text-on-surface-variant shadow-sm">
-          Chargement des événements...
-        </div>
-      ) : error ? (
-        <div className="rounded-3xl border border-red-300 bg-red-50 p-6 text-body-md text-red-700 shadow-sm">
-          {error}
-        </div>
-      ) : publications.length === 0 ? (
-        <div className="rounded-3xl border border-outline-variant bg-surface p-6 text-body-md text-on-surface-variant shadow-sm">
-          <h3 className="text-lg font-semibold text-on-surface">Aucune publication pour l'instant</h3>
-          <p className="mt-2 text-sm text-on-surface-variant">Aucune landing page n'a été créée pour l'instant. Vous pouvez en créer une depuis l'éditeur de publication.</p>
-          <div className="mt-4">
-            {selectedEventId ? (
-              <button
-                type="button"
-                onClick={() => navigate(`/publication-builder/${selectedEventId}`)}
-                className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-container"
-              >
-                Créer la page de publication
-              </button>
-            ) : (
-              <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 text-sm text-on-surface-variant">
-                Sélectionnez un événement dans la barre latérale pour créer une publication.
-              </div>
-            )}
+  return (
+    <main className="dash-page flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-screen">
+      <div className="relative z-10 max-w-5xl mx-auto px-gutter pb-12 pt-24 md:pt-28">
+        <AppPageHeader
+          title="Publication"
+          subtitle="Gérez la landing page publique de l'événement sélectionné."
+        />
+
+        {error && (
+          <div className="mb-6 p-4 rounded-xl border border-error/30 bg-error-container/40 text-sm text-on-error-container">
+            {error}
           </div>
-        </div>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {publications.map((publication) => (
-            <div key={publication.eventId} className="overflow-hidden rounded-3xl border border-outline-variant bg-surface shadow-sm">
-              <div className="relative h-52 bg-surface-variant">
-                {publication.heroImage ? (
-                  <img
-                    src={publication.heroImage}
-                    alt={publication.heroTitle}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center bg-surface-container-highest text-sm text-on-surface-variant">
-                    Aucune image de couverture
-                  </div>
-                )}
-                <div className="absolute inset-x-0 bottom-0 bg-black/40 px-4 py-3 text-white">
-                  <h3 className="text-sm font-semibold line-clamp-1">{publication.heroTitle}</h3>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-headline-sm font-semibold text-on-surface">{publication.eventTitle}</h2>
-                    </div>
-                    <label className="inline-flex items-center gap-2 text-sm font-medium text-on-surface-variant">
-                      <span>{publication.isPublished ? 'Publié' : 'Brouillon'}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePublish(publication.eventId, publication.isPublished)}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer items-center rounded-full transition-colors ${publication.isPublished ? 'bg-emerald-500' : 'bg-surface-container-highest'}`}
-                        aria-label={publication.isPublished ? 'Dépublier la publication' : 'Publier la publication'}
-                      >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${publication.isPublished ? 'translate-x-5' : 'translate-x-0'}`} />
-                      </button>
-                    </label>
-                  </div>
-                  {publication.updatedAt && (
-                    <p className="text-xs text-on-surface-variant">Dernière mise à jour : {new Date(publication.updatedAt).toLocaleString('fr-FR')}</p>
-                  )}
-                </div>
-                <div className="mt-6 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/publication-builder/${publication.eventId}`)}
-                    className="inline-flex flex-1 items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-container"
-                  >
-                    Modifier la page
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+        )}
+
+        {!selectedEventId ? (
+          <div className="dash-empty-state">
+            <span className="material-symbols-outlined text-5xl text-primary mb-4 block" aria-hidden="true">
+              event
+            </span>
+            <h2 className="font-landing-display text-2xl app-heading mb-2">Sélectionnez un événement</h2>
+            <p className="app-text-muted text-sm max-w-sm mx-auto">
+              Choisissez un événement dans le menu en haut à gauche pour gérer sa page de publication.
+            </p>
+          </div>
+        ) : !activePublication ? (
+          <div className="dash-empty-state">
+            <span className="material-symbols-outlined text-5xl text-primary mb-4 block" aria-hidden="true">
+              web
+            </span>
+            <h2 className="font-landing-display text-2xl app-heading mb-2">Page non configurée</h2>
+            <p className="app-text-muted text-sm mb-6 max-w-sm mx-auto">
+              La landing page de cet événement n&apos;a pas encore été créée. Ouvrez l&apos;éditeur pour la configurer.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate(`/publication-builder/${selectedEventId}`)}
+              className="landing-btn-primary !px-6 !py-3 !text-sm !rounded-xl"
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">edit_document</span>
+              Configurer la page
+            </button>
+          </div>
+        ) : (
+          <PublicationPanel
+            publication={activePublication}
+            isToggling={isToggling}
+            onTogglePublish={handleTogglePublish}
+            onEdit={(eventId) => navigate(`/publication-builder/${eventId}`)}
+            onPreview={(eventId) => window.open(`/evenements/${eventId}`, '_blank', 'noopener,noreferrer')}
+          />
+        )}
+      </div>
+    </main>
   );
 }

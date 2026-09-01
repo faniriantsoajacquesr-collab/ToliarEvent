@@ -4,6 +4,8 @@ import SocialPlatformIcon from '../components/SocialPlatformIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/authAPI';
 import PublicationTemplate, { type TicketCard } from '../components/PublicationTemplate';
+import ThemeToggle from '../components/ThemeToggle';
+import { InlineListSkeleton } from '../components/skeleton';
 
 interface SocialLinkItem {
   platform: 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'youtube' | 'twitter' | 'website';
@@ -539,16 +541,21 @@ export default function PublicationBuilder({ eventId, eventName: initialEventNam
   );
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8">
+    <div className="app-shell min-h-screen">
+      <header className="app-topbar sticky top-0 z-40 border-b px-gutter py-3 flex items-center justify-between">
+        <button type="button" onClick={handleBack} className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+          <span className="material-symbols-outlined">arrow_back</span>
+          Retour au dashboard
+        </button>
+        <ThemeToggle />
+      </header>
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8">
       {/* Header Panel */}
       <div className="mb-8">
         <div className="flex flex-col gap-4 rounded-3xl border border-outline-variant bg-surface p-6 shadow-sm md:flex-row md:items-center md:justify-between">
           <div>
-            <button type="button" onClick={handleBack} className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
-              <span className="material-symbols-outlined">arrow_back</span>Retour
-            </button>
-            <h1 className="mt-4 text-headline-lg font-bold text-on-surface">Éditeur de publication</h1>
-            <p className="mt-2 text-body-md text-on-surface-variant">Personnalisez la landing page de "{eventName}".</p>
+            <h1 className="font-landing-display text-2xl app-heading">Éditeur de publication</h1>
+            <p className="mt-2 text-sm app-text-muted">Personnalisez la landing page de &quot;{eventName}&quot;.</p>
           </div>
           <div className="flex flex-col items-start gap-3 sm:items-end">
             <button
@@ -776,9 +783,9 @@ export default function PublicationBuilder({ eventId, eventName: initialEventNam
                 <div className="flex flex-col gap-2">
                   <h3 className="text-headline-sm font-semibold text-on-surface">Gestion des Billets</h3>
                   <p className="text-xs text-on-surface-variant">Cochez les catégories de pass à afficher.</p>
-                  {ticketTypesLoading && (
-                    <p className="text-xs text-on-surface-variant">Chargement des types de billets...</p>
-                  )}
+                  {ticketTypesLoading ? (
+                    <InlineListSkeleton rows={4} />
+                  ) : null}
                   {ticketTypesError && (
                     <p className="text-xs text-error">{ticketTypesError}</p>
                   )}
@@ -980,6 +987,7 @@ export default function PublicationBuilder({ eventId, eventName: initialEventNam
         </div>
 
       </div>
+    </div>
     </div>
   );
 }

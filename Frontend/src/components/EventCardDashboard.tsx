@@ -1,3 +1,14 @@
+const CARD_GRADIENTS = [
+  'from-blue-600 via-indigo-600 to-violet-700',
+  'from-amber-500 via-orange-500 to-rose-600',
+  'from-emerald-500 via-teal-600 to-cyan-700',
+  'from-fuchsia-500 via-purple-600 to-indigo-700',
+  'from-sky-500 via-blue-600 to-indigo-700',
+] as const;
+
+const DEFAULT_EVENT_IMAGE =
+  'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80';
+
 interface EventCardProps {
   id: string;
   name: string;
@@ -8,14 +19,30 @@ interface EventCardProps {
   endDate: string;
   status: 'active' | 'upcoming' | 'completed';
   icon: string;
+  imageUrl?: string;
   isActive: boolean;
-  onSelect: (id: string) => void;
+  onActivate: (id: string) => void;
+  onView: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   isDeleting?: boolean;
 }
 
-export default function EventCard({
+function gradientForId(id: string) {
+  const index = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % CARD_GRADIENTS.length;
+  return CARD_GRADIENTS[index];
+}
+
+function parseDayMonth(dateStr: string) {
+  if (!dateStr) return { day: '—', month: '—' };
+  const parts = dateStr.split(' ');
+  return {
+    day: parts[0]?.replace(/\D/g, '') || '—',
+    month: parts[1]?.slice(0, 3).toUpperCase() || '—',
+  };
+}
+
+export default function EventCardDashboard({
   id,
   name,
   category,
@@ -25,145 +52,163 @@ export default function EventCard({
   endDate,
   status,
   icon,
+  imageUrl,
   isActive,
-  onSelect,
+  onActivate,
+  onView,
   onEdit,
   onDelete,
   isDeleting,
 }: EventCardProps) {
-  const getStatusColor = () => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-700';
-      case 'upcoming':
-        return 'bg-primary-fixed text-on-primary-fixed-variant';
-      case 'completed':
-        return 'bg-surface-variant text-on-surface-variant';
-      default:
-        return '';
-    }
-  };
+  const { day, month } = parseDayMonth(startDate);
+  const gradient = gradientForId(id);
+  const cover = imageUrl || DEFAULT_EVENT_IMAGE;
 
-  const getStatusLabel = () => {
-    switch (status) {
-      case 'active':
-        return 'En cours';
-      case 'upcoming':
-        return 'À venir';
-      case 'completed':
-        return 'Terminé';
-      default:
-        return '';
-    }
-  };
-
-  const getIconBgColor = () => {
-    switch (icon) {
-      case 'stars':
-        return 'bg-primary/10 text-primary';
-      case 'sports_esports':
-      case 'festival':
-        return 'bg-surface-container-high text-on-surface-variant';
-      default:
-        return 'bg-primary/10 text-primary';
-    }
-  };
+  const statusConfig = {
+    active: {
+      label: 'En cours',
+      className: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25',
+      dot: 'bg-emerald-500 animate-pulse',
+    },
+    upcoming: {
+      label: 'À venir',
+      className: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25',
+      dot: 'bg-blue-500',
+    },
+    completed: {
+      label: 'Terminé',
+      className: 'bg-[var(--md-surface-subtle)] app-text-muted border-[var(--md-border)]',
+      dot: 'bg-[var(--md-text-muted)]',
+    },
+  }[status];
 
   return (
-    <div
-      className={`group relative bg-surface-container-lowest rounded-xl p-lg shadow-sm transition-all hover:shadow-xl cursor-pointer ${
-        isActive
-          ? 'border-2 border-primary shadow-md'
-          : 'border border-outline-variant hover:border-primary'
-      }`}
-      onClick={() => onSelect(id)}
+    <article
+      className={`dash-event-card group ${isActive ? 'dash-event-card--active' : ''}`}
+      onClick={() => onActivate(id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onActivate(id);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isActive}
+      aria-label={`Événement ${name}${isActive ? ', contexte actif' : ''}`}
     >
-      {isActive && (
-        <div className="absolute top-4 right-4 bg-primary-container text-on-primary-container text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
-          ACTIF
-        </div>
-      )}
+      <div className="dash-event-card__media">
+        <img
+          src={cover}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          loading="lazy"
+        />
+        <div className={`absolute inset-0 bg-gradient-to-t ${gradient} opacity-30 mix-blend-multiply`} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-      <div className="flex flex-col h-full">
-        <div className="flex items-center gap-md mb-md">
-          <div
-            className={`w-12 h-12 rounded-lg flex items-center justify-center ${getIconBgColor()}`}
+        <div className="absolute top-3 left-3 w-12 h-12 rounded-xl flex flex-col items-center justify-center shadow-lg backdrop-blur-md bg-white/95 dark:bg-black/60 border border-white/20">
+          <span className="text-base font-black leading-none app-heading">{day}</span>
+          <span className="text-[9px] font-bold uppercase tracking-wider app-text-muted mt-0.5">{month}</span>
+        </div>
+
+        {category && (
+          <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-black/50 backdrop-blur-md text-white border border-white/15">
+            {category}
+          </span>
+        )}
+
+        {isActive && (
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary text-white shadow-lg">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            Contexte actif
+          </span>
+        )}
+
+        <div className="absolute bottom-3 right-3 w-9 h-9 rounded-xl flex items-center justify-center bg-white/15 backdrop-blur-md border border-white/20 text-white">
+          <span
+            className="material-symbols-outlined text-lg"
+            style={icon === 'stars' ? { fontVariationSettings: "'FILL' 1" } : {}}
           >
-            <span
-              className="material-symbols-outlined"
-              style={icon === 'stars' ? { fontVariationSettings: "'FILL' 1" } : {}}
-            >
-              {icon}
-            </span>
-          </div>
-          <div>
-            <h4 className="text-headline-md font-bold text-on-surface">{name}</h4>
-            {category ? (
-              <p className="text-label-sm text-on-surface-variant mb-1">Catégorie: {category}</p>
-            ) : null}
-            <p className="text-label-md text-on-surface-variant flex items-center gap-xs">
-              <span className="material-symbols-outlined text-[16px]">person</span>
+            {icon}
+          </span>
+        </div>
+      </div>
+
+      <div className="dash-event-card__body">
+        <div>
+          <h3 className="font-landing-display text-lg md:text-xl app-heading line-clamp-1 group-hover:text-primary transition-colors">
+            {name}
+          </h3>
+          {organizer && (
+            <p className="text-xs app-text-muted mt-1 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">groups</span>
               {organizer}
             </p>
-          </div>
+          )}
         </div>
 
-        <div className="space-y-sm mb-lg flex-1">
-          <div className="flex items-center gap-sm text-body-md text-on-surface-variant">
-            <span className="material-symbols-outlined text-primary">map</span>
-            {location}
-          </div>
-          <div className="flex items-center gap-sm text-body-md text-on-surface-variant">
-            <span className="material-symbols-outlined text-primary">
-              calendar_today
-            </span>
-            {startDate} - {endDate}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between mt-auto pt-md border-t border-outline-variant">
-          <div
-            className={`flex items-center gap-sm px-3 py-1 rounded-full text-xs font-bold ${getStatusColor()} ${
-              status === 'active' ? 'animate-pulse' : ''
-            }`}
-          >
-            {status === 'active' && (
-              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-            )}
-            {getStatusLabel()}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="px-3 py-2 rounded-xl bg-primary/10 text-primary font-bold text-label-md hover:bg-primary/20 transition-colors flex items-center gap-xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(id);
-              }}
-            >
-              Modifier
-              <span className="material-symbols-outlined text-[18px]">
-                edit
+        <div className="space-y-2">
+          {location && (
+            <div className="dash-meta-row">
+              <span className="material-symbols-outlined text-primary text-sm shrink-0" aria-hidden="true">
+                location_on
               </span>
-            </button>
+              <span className="truncate">{location}</span>
+            </div>
+          )}
+          <div className="dash-meta-row">
+            <span className="material-symbols-outlined text-primary text-sm shrink-0" aria-hidden="true">
+              calendar_month
+            </span>
+            <span className="truncate">
+              {startDate}{endDate ? ` — ${endDate}` : ''}
+            </span>
+          </div>
+        </div>
 
+        <div className="flex items-center justify-between gap-3 pt-1 mt-auto">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusConfig.className}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
+            {statusConfig.label}
+          </span>
+
+          <div className="dash-action-group" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
             <button
-              disabled={isDeleting}
-              className={`px-3 py-2 rounded-xl font-bold text-label-md flex items-center gap-xs transition-colors ${isDeleting ? 'bg-error/10 text-error opacity-60 cursor-not-allowed' : 'bg-error/10 text-error hover:bg-error/20'}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isDeleting) onDelete(id);
-              }}
+              type="button"
+              className="dash-action-btn dash-action-btn--primary"
+              title="Voir les détails"
+              aria-label={`Voir les détails de ${name}`}
+              onClick={() => onView(id)}
             >
-              {isDeleting ? (
-                <span className="material-symbols-outlined animate-spin text-[18px]">autorenew</span>
-              ) : (
-                <span className="material-symbols-outlined text-[18px]">delete</span>
-              )}
-              <span className="ml-1">Supprimer</span>
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
+            </button>
+            <button
+              type="button"
+              className="dash-action-btn dash-action-btn--primary"
+              title="Modifier"
+              aria-label={`Modifier ${name}`}
+              onClick={() => onEdit(id)}
+            >
+              <span className="material-symbols-outlined text-[18px]">edit</span>
+            </button>
+            <button
+              type="button"
+              disabled={isDeleting}
+              className={`dash-action-btn dash-action-btn--danger ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title="Supprimer"
+              aria-label={`Supprimer ${name}`}
+              onClick={() => !isDeleting && onDelete(id)}
+            >
+              <span className={`material-symbols-outlined text-[18px] ${isDeleting ? 'animate-spin' : ''}`}>
+                {isDeleting ? 'progress_activity' : 'delete'}
+              </span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 }

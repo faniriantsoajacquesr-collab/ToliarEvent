@@ -1,3 +1,5 @@
+import RevealOnScroll from './RevealOnScroll';
+
 const PHONE = '+261328980072';
 const PHONE_DISPLAY = '+261 32 89 800 72';
 const EMAIL = 'faniriantsoajacquesr@gmail.com';
@@ -8,52 +10,82 @@ const CONTACTS = [
     value: PHONE_DISPLAY,
     href: `https://wa.me/${PHONE.replace('+', '')}`,
     icon: 'chat',
+    description: 'Réponse rapide, idéal pour une démo',
   },
   {
-    label: 'Numéro téléphone',
+    label: 'Téléphone',
     value: PHONE_DISPLAY,
     href: `tel:${PHONE}`,
     icon: 'call',
+    description: 'Appelez-nous directement',
   },
   {
-    label: 'Mail',
+    label: 'Email',
     value: EMAIL,
     href: `mailto:${EMAIL}`,
     icon: 'mail',
+    description: 'Pour les demandes détaillées',
   },
 ];
 
 export default function ContactSection() {
   return (
-    <section id="contact" className="bg-surface py-24 px-gutter scroll-mt-28">
-      <div className="max-w-[720px] mx-auto text-center">
-        <h2 className="font-display-lg text-display-lg text-on-background mb-md">Contact</h2>
-        <p className="font-body-lg text-body-lg text-on-surface-variant mb-xl">
-          Une question ? Contactez-nous directement.
-        </p>
-
-        <div className="glass-card rounded-[32px] p-xl shadow-2xl space-y-lg text-left">
-          {CONTACTS.map((contact) => (
-            <a
-              key={contact.label}
-              href={contact.href}
-              target={contact.label === 'WhatsApp' ? '_blank' : undefined}
-              rel={contact.label === 'WhatsApp' ? 'noopener noreferrer' : undefined}
-              className="flex items-center gap-lg p-lg rounded-2xl bg-surface-container-low hover:bg-surface-container transition-colors group"
+    <section
+      id="contact"
+      className="landing-section landing-section-surface scroll-mt-28 relative"
+      aria-labelledby="contact-heading"
+    >
+      <div className="landing-container">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 lg:gap-20 items-start">
+          <RevealOnScroll direction="left">
+            <p className="landing-eyebrow mb-5">Contact</p>
+            <h2
+              id="contact-heading"
+              className="font-landing-display text-3xl md:text-5xl leading-[1.08] tracking-tight mb-6 landing-heading"
             >
-              <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                <span className="material-symbols-outlined text-[28px]">{contact.icon}</span>
-              </div>
-              <div>
-                <p className="font-label-md text-label-md text-on-surface-variant mb-xs">
-                  {contact.label}
-                </p>
-                <p className="font-headline-sm text-headline-sm font-bold text-on-background group-hover:text-primary transition-colors">
-                  {contact.value}
-                </p>
-              </div>
-            </a>
-          ))}
+              Une question sur votre
+              <br />
+              <span className="landing-gradient-text">prochain événement ?</span>
+            </h2>
+            <p className="landing-text-muted text-lg leading-relaxed max-w-md">
+              L&apos;équipe ToliarEvent est basée à Toliara. Contactez-nous pour une démo,
+              un accompagnement ou toute question sur la plateforme.
+            </p>
+          </RevealOnScroll>
+
+          <div className="space-y-3">
+            {CONTACTS.map((contact, i) => (
+              <RevealOnScroll key={contact.label} delay={i * 100} direction="right">
+                <a
+                  href={contact.href}
+                  target={contact.label === 'WhatsApp' ? '_blank' : undefined}
+                  rel={contact.label === 'WhatsApp' ? 'noopener noreferrer' : undefined}
+                  className="landing-glass-card flex items-center gap-5 p-5 rounded-2xl group cursor-pointer"
+                >
+                  <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                    <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
+                      {contact.icon}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] landing-text-subtle mb-0.5">
+                      {contact.label}
+                    </p>
+                    <p className="font-semibold landing-heading group-hover:text-primary transition-colors truncate">
+                      {contact.value}
+                    </p>
+                    <p className="text-sm landing-text-subtle mt-0.5">{contact.description}</p>
+                  </div>
+                  <span
+                    className="material-symbols-outlined landing-text-subtle group-hover:text-primary group-hover:translate-x-1 transition-all shrink-0"
+                    aria-hidden="true"
+                  >
+                    arrow_forward
+                  </span>
+                </a>
+              </RevealOnScroll>
+            ))}
+          </div>
         </div>
       </div>
     </section>
