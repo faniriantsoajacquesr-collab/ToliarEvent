@@ -104,30 +104,14 @@ export default function Home() {
               <div className="relative max-w-md mx-auto lg:max-w-none lg:ml-auto perspective-[1200px]">
                 <div className="landing-hero-card-glow" aria-hidden="true" />
                 <div className="landing-hero-card">
-                  <div className="p-2">
+                  <div className="landing-hero-card-content">
                     <img
                       src={heroImage}
                       alt="Interface ToliarEvent — gestion d'événements à Toliara"
                       className="rounded-xl w-full"
                     />
                   </div>
-                  <div className="px-5 py-4 landing-hero-card-footer flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className="material-symbols-outlined text-primary text-[18px]"
-                        aria-hidden="true"
-                      >
-                        qr_code_2
-                      </span>
-                      <span className="text-xs font-medium landing-text-subtle tracking-wide">
-                        Validé → Payé → Utilisé
-                      </span>
-                    </div>
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-landing-gold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-landing-gold landing-step-ring" />
-                      Live
-                    </span>
-                  </div>
+                  
                 </div>
               </div>
             </div>
