@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { API_URL } from '../config/api';
 import GanttChart from '../components/GanttChart';
 import { PlanningSkeleton } from '../components/skeleton';
+import AppPageHeader from '../components/AppPageHeader';
 import type { GanttTask } from '../components/GanttChart';
 import { useAuth } from '../contexts/AuthContext';
 import TaskFormModal from '../components/TaskFormModal';
@@ -13,6 +14,15 @@ interface KPIData {
   alerts: number;
   assignmentIndex: string;
 }
+
+const STATUS_FILTERS = [
+  { value: 'all' as const, label: 'Tous' },
+  { value: 'not-started' as const, label: 'Pas commencé' },
+  { value: 'overdue' as const, label: 'En retard' },
+  { value: 'in-progress' as const, label: 'En cours' },
+  { value: 'completed' as const, label: 'Terminé' },
+  { value: 'blocked' as const, label: 'Bloqué' },
+];
 
 export default function PlanningManagement({ selectedEventId }: { selectedEventId?: string | null }) {
   const [filterText, setFilterText] = useState('');
@@ -306,154 +316,188 @@ export default function PlanningManagement({ selectedEventId }: { selectedEventI
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-xl pb-xl pt-28 min-h-screen space-y-xl">
-        {/* KPIs Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-md">
-          <div className="bg-surface-container-lowest p-md rounded-xl border border-outline-variant shadow-sm">
-            <p className="text-xs font-medium text-on-surface-variant mb-1">Avancement Global</p>
-            <h4 className="text-headline-md font-bold text-primary">{kpiData.progress}</h4>
-          </div>
-          <div className="bg-surface-container-lowest p-md rounded-xl border border-outline-variant shadow-sm">
-            <p className="text-xs font-medium text-on-surface-variant mb-1">Tâches En Cours</p>
-            <h4 className="text-headline-md font-bold text-on-surface">{kpiData.tasksInProgress}</h4>
-          </div>
-          <div className="bg-error-container p-md rounded-xl border border-error/20 shadow-sm">
-            <p className="text-xs font-medium text-on-error-container mb-1">Alerte Retards</p>
-            <h4 className="text-headline-md font-bold text-on-error-container">{kpiData.alerts}</h4>
-          </div>
-          <div className="bg-surface-container-lowest p-md rounded-xl border border-outline-variant shadow-sm">
-            <p className="text-xs font-medium text-on-surface-variant mb-1">Indice d'Assignation</p>
-            <h4 className="text-headline-md font-bold text-on-surface">{kpiData.assignmentIndex}</h4>
-          </div>
-        </div>
+      <main className="dash-page flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-screen">
+        <div className="relative z-10 max-w-container-max mx-auto px-gutter pb-12 pt-24 md:pt-28 space-y-8">
+          <AppPageHeader
+            title="Timeline logistique"
+            subtitle={eventTitle ? `Planning opérationnel — ${eventTitle}` : 'Planifiez et suivez les missions de votre événement.'}
+            actions={
+              !isStaffUser ? (
+                <button
+                  type="button"
+                  onClick={() => { if (selectedEventId) setIsModalOpen(true); }}
+                  disabled={!selectedEventId}
+                  className="badge-editor-cta !w-auto inline-flex items-center gap-2 px-5 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="material-symbols-outlined text-lg">add</span>
+                  Ajouter une tâche
+                </button>
+              ) : undefined
+            }
+          />
 
-        {/* Header & Controls */}
-        <div className="flex justify-between items-end gap-lg">
-          <div>
-            <h3 className="text-headline-lg font-headline-lg text-on-surface">Logistics Timeline</h3>
-            <p className="text-on-surface-variant font-body-md">{eventTitle || 'Planning de l\'événement'}</p>
-          </div>
-          {!isStaffUser && (
-            <button
-              onClick={() => { if (selectedEventId) setIsModalOpen(true); }}
-              disabled={!selectedEventId}
-              className={`px-lg py-2.5 rounded-xl font-bold flex items-center gap-md transition-opacity whitespace-nowrap ${selectedEventId ? 'bg-primary text-white hover:opacity-90' : 'bg-outline-variant text-on-surface-variant cursor-not-allowed'}`}>
-              <span className="material-symbols-outlined">add</span>
-              + Ajouter une tâche
-            </button>
+          {!selectedEventId ? (
+            <div className="dash-empty-state">
+              <span className="material-symbols-outlined text-4xl text-primary/70 mb-3">event_busy</span>
+              <p className="font-landing-display text-lg app-heading mb-1">Aucun événement sélectionné</p>
+              <p className="text-sm app-text-muted">Sélectionnez un événement pour afficher le planning logistique.</p>
+            </div>
+          ) : isLoading ? (
+            <PlanningSkeleton />
+          ) : (
+            <>
+              <section>
+                <p className="landing-eyebrow mb-4">Vue d&apos;ensemble</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <div className="dash-stat-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="dash-stat-label mb-1">Avancement global</p>
+                        <p className="dash-stat-value text-primary">{kpiData.progress}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-2xl text-primary opacity-80">donut_large</span>
+                    </div>
+                  </div>
+                  <div className="dash-stat-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="dash-stat-label mb-1">Tâches en cours</p>
+                        <p className="dash-stat-value">{kpiData.tasksInProgress.toLocaleString('fr-FR')}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-2xl text-indigo-500 opacity-80">pending_actions</span>
+                    </div>
+                  </div>
+                  <div className={`dash-stat-card ${kpiData.alerts > 0 ? 'border-red-500/35 ring-1 ring-red-500/15' : ''}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className={`dash-stat-label mb-1 ${kpiData.alerts > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                          Alerte retards
+                        </p>
+                        <p className={`dash-stat-value ${kpiData.alerts > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                          {kpiData.alerts.toLocaleString('fr-FR')}
+                        </p>
+                      </div>
+                      <span className={`material-symbols-outlined text-2xl opacity-80 ${kpiData.alerts > 0 ? 'text-red-500' : 'text-amber-500'}`}>
+                        warning
+                      </span>
+                    </div>
+                  </div>
+                  <div className="dash-stat-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="dash-stat-label mb-1">Indice d&apos;assignation</p>
+                        <p className="dash-stat-value">{kpiData.assignmentIndex}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-2xl text-teal-500 opacity-80">assignment_ind</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-5">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                  <div>
+                    <p className="landing-eyebrow mb-2">Filtres</p>
+                    <h2 className="font-landing-display text-xl app-heading">Missions & timeline</h2>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('table')}
+                      className={`landing-chip ${viewMode === 'table' ? 'landing-chip--active' : ''}`}
+                    >
+                      Table
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('calendar')}
+                      className={`landing-chip ${viewMode === 'calendar' ? 'landing-chip--active' : ''}`}
+                    >
+                      Calendrier
+                    </button>
+                  </div>
+                </div>
+
+                <div className="dash-toolbar flex-col xl:flex-row">
+                  <div className="relative flex-[1.4] min-w-[220px]">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 app-text-muted text-lg pointer-events-none">search</span>
+                    <input
+                      type="search"
+                      placeholder="Rechercher une mission, un assigné ou un mot-clé…"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm app-input bg-transparent border-0 focus:outline-none"
+                      value={filterText}
+                      onChange={(e) => setFilterText(e.target.value)}
+                    />
+                  </div>
+                  <div className="hidden md:flex items-center gap-3 flex-1 min-w-[180px] px-2">
+                    <span className="material-symbols-outlined app-text-muted text-lg shrink-0">calendar_view_week</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider app-text-muted shrink-0 hidden sm:block">Largeur</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="300"
+                      value={cellWidth}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        setCellWidth(value);
+                        handleCellWidthChange(value);
+                      }}
+                      className="flex-1 accent-[var(--landing-primary)]"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm app-text-muted cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={onlyMine}
+                      onChange={(e) => setOnlyMine(e.target.checked)}
+                      className="h-4 w-4 rounded accent-[var(--landing-primary)]"
+                    />
+                    <span>Mes tâches uniquement</span>
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {STATUS_FILTERS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setStatusFilter(option.value)}
+                      className={`landing-chip ${statusFilter === option.value ? 'landing-chip--active' : ''}`}
+                    >
+                      {option.label}
+                      {option.value === 'overdue' && kpiData.alerts > 0 && (
+                        <span className="ml-1 opacity-80">({kpiData.alerts})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <GanttChart
+                  tasks={filteredTasks}
+                  cellWidth={debouncedCellWidth}
+                  days={getDisplayLabels()}
+                  onTaskClick={handleTaskClick}
+                />
+              </section>
+            </>
           )}
         </div>
+      </main>
 
-        {isLoading ? (
-          <PlanningSkeleton />
-        ) : (
-          <>
-        <div className="flex flex-col gap-md">
-          <div className="flex justify-between items-center gap-md">
-            <div className="relative flex-1 max-w-md">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">
-                search
-              </span>
-              <input
-                type="text"
-                placeholder="Rechercher une mission, un assigné ou un mot-clé..."
-                className="w-full bg-surface-container-low pl-10 pr-4 py-2.5 rounded-xl border border-outline-variant focus:ring-2 focus:ring-primary focus:border-primary text-body-md shadow-sm outline-none transition-all"
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-md">
-              {/* Contrôle de la largeur des cellules (Zoom) */}
-              <div className="hidden md:flex items-center gap-md bg-surface-container-low px-lg py-2 rounded-xl border border-outline-variant shadow-sm">
-                <div className="flex items-center gap-sm">
-                  <span className="material-symbols-outlined text-on-surface-variant text-md">
-                    calendar_view_week
-                  </span>
-                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest hidden lg:block">Largeur</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="300"
-                  value={cellWidth}
-                  onChange={(e) => { setCellWidth(Number(e.target.value)); handleCellWidthChange(Number(e.target.value)); }}
-                  className="w-24 lg:w-32 h-1.5 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-              </div>
-
-              <div className="flex bg-surface-container rounded-lg p-1">
-                <button
-                  className={`px-md py-1.5 rounded-md font-label-md transition-all ${
-                    viewMode === 'table'
-                      ? 'bg-white shadow-sm text-primary'
-                      : 'text-on-surface-variant'
-                  }`}
-                  onClick={() => setViewMode('table')}
-                >
-                  Table
-                </button>
-                <button
-                  className={`px-md py-1.5 rounded-md font-label-md transition-all ${
-                    viewMode === 'calendar'
-                      ? 'bg-white shadow-sm text-primary'
-                      : 'text-on-surface-variant'
-                  }`}
-                  onClick={() => setViewMode('calendar')}
-                >
-                  Calendar
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-md">
-            <label className="flex items-center gap-sm bg-surface-container-low px-md py-2 rounded-lg border border-outline-variant text-sm text-on-surface-variant">
-              <span className="font-medium">Statut</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'not-started' | 'overdue' | 'in-progress' | 'completed' | 'blocked')}
-                className="bg-transparent outline-none text-on-surface"
-              >
-                <option value="all">Tous</option>
-                <option value="not-started">Pas commencé</option>
-                <option value="overdue">En retard</option>
-                <option value="in-progress">En cours</option>
-                <option value="completed">Terminé</option>
-                <option value="blocked">Bloqué</option>
-              </select>
-            </label>
-
-            <label className="flex items-center gap-sm cursor-pointer text-sm text-on-surface-variant">
-              <input
-                type="checkbox"
-                checked={onlyMine}
-                onChange={(e) => setOnlyMine(e.target.checked)}
-                className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
-              />
-              <span>N'afficher que mes tâches</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Gantt Chart */}
-        <GanttChart tasks={filteredTasks} cellWidth={debouncedCellWidth} days={getDisplayLabels()} onTaskClick={handleTaskClick} />
-        <TaskFormModal
-          isOpen={isModalOpen}
-          onClose={() => { setIsModalOpen(false); }}
-          eventId={selectedEventId}
-          eventTitle={eventTitle}
-          onCreated={refreshTasks}
-        />
-        <TaskDetailsModal
-          isOpen={isDetailsModalOpen}
-          task={selectedTask}
-          eventTitle={eventTitle}
-          onClose={() => { setIsDetailsModalOpen(false); setSelectedTask(null); }}
-          onUpdated={refreshTasks}
-        />
-          </>
-        )}
-      </div>
+      <TaskFormModal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); }}
+        eventId={selectedEventId}
+        eventTitle={eventTitle}
+        onCreated={refreshTasks}
+      />
+      <TaskDetailsModal
+        isOpen={isDetailsModalOpen}
+        task={selectedTask}
+        eventTitle={eventTitle}
+        onClose={() => { setIsDetailsModalOpen(false); setSelectedTask(null); }}
+        onUpdated={refreshTasks}
+      />
     </>
   );
 }

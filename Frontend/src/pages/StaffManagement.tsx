@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { TablePageSkeleton } from '../components/skeleton';
+import AppPageHeader from '../components/AppPageHeader';
 import StaffTable from '../components/StaffTable';
 import StaffModal from '../components/StaffModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -307,223 +308,149 @@ export default function StaffManagement({ selectedEventId }: { selectedEventId?:
 
   return (
     <>
-      <main className="flex-1 pt-28 pb-xl px-gutter max-w-container-max mx-auto w-full overflow-y-auto overflow-x-hidden">
-        {/* Page Title */}
-        <div className="mb-xl fade-in-up">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="font-headline-lg text-headline-lg text-on-surface">
-                Gestion du Staff RH
-              </h1>
-              <p className="text-on-surface-variant font-body-md text-body-md mt-xs">
-                  Supervisez vos équipes et validez les nouveaux profils pour les
-                  événements de Toliara.
-                </p>
+      <main className="dash-page flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-screen">
+        <div className="relative z-10 max-w-container-max mx-auto px-gutter pb-12 pt-24 md:pt-28 space-y-8">
+          <AppPageHeader
+            title="Gestion du Staff RH"
+            subtitle="Supervisez vos équipes et validez les nouveaux profils pour les événements de Toliara."
+          />
+
+          <section>
+            <p className="landing-eyebrow mb-4">Vue d&apos;ensemble</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="dash-stat-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="dash-stat-label mb-1">Effectif total</p>
+                    <p className="dash-stat-value">{totalStaff.toLocaleString('fr-FR')}</p>
+                    <p className="text-xs app-text-muted mt-1">membre{totalStaff > 1 ? 's' : ''} actif{totalStaff > 1 ? 's' : ''}</p>
+                  </div>
+                  <span className="material-symbols-outlined text-2xl text-primary opacity-80">group</span>
+                </div>
+              </div>
+
+              <div className={`dash-stat-card ${toValidateCount > 0 ? 'border-amber-500/40 ring-1 ring-amber-500/20' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className={`dash-stat-label mb-1 ${toValidateCount > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+                      Alerte RH
+                    </p>
+                    <p className="dash-stat-value">{toValidateCount.toLocaleString('fr-FR')}</p>
+                    <p className="text-xs app-text-muted mt-1">profil{toValidateCount > 1 ? 's' : ''} à valider</p>
+                  </div>
+                  <span
+                    className={`material-symbols-outlined text-2xl opacity-80 ${toValidateCount > 0 ? 'text-amber-500' : 'text-red-400'}`}
+                    style={toValidateCount > 0 ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                  >
+                    {toValidateCount > 0 ? 'notification_important' : 'verified_user'}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-xl">
-            {/* Total Staff Card */}
-            <div className="bg-surface-container-lowest p-lg rounded-xl border border-outline-variant/30 shadow-sm flex items-center gap-lg fade-in-up hover-lift">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined text-4xl">group</span>
-              </div>
+          <section className="space-y-5">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
               <div>
-                <p className="text-on-surface-variant font-label-md text-label-md">
-                  Effectif Total
-                </p>
-                <h2 className="font-headline-lg text-headline-lg text-on-surface">
-                  {totalStaff} membres
-                </h2>
+                <p className="landing-eyebrow mb-2">Registre</p>
+                <h2 className="font-landing-display text-xl app-heading">Liste des profils</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { value: 'all' as const, label: 'Tous les statuts' },
+                    { value: 'pending' as const, label: 'En attente' },
+                    { value: 'validated' as const, label: 'Validés' },
+                    ...(selectedEventId ? [{ value: 'rejected' as const, label: 'Refusés' }] : []),
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setStatusFilter(option.value)}
+                    className={`landing-chip ${statusFilter === option.value ? 'landing-chip--active' : ''}`}
+                  >
+                    {option.label}
+                    {option.value === 'pending' && toValidateCount > 0 && (
+                      <span className="ml-1 opacity-80">({toValidateCount})</span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Alert Card */}
-            <div
-              className={`bg-surface-container-lowest p-lg rounded-xl border-2 border-error/20 shadow-sm flex items-center gap-lg relative overflow-hidden fade-in-up hover-lift ${
-                toValidateCount > 0 ? 'pulse-soft' : ''
-              }`}
-            >
-              <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center text-error relative z-10">
-                <span
-                  className="material-symbols-outlined text-4xl"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  error
-                </span>
-              </div>
-              <div className="relative z-10">
-                <p className="text-error font-label-md text-label-md font-bold uppercase tracking-wider">
-                  Alerte RH
-                </p>
-                <h2 className="font-headline-lg text-headline-lg text-on-surface">
-                  {toValidateCount} profils à valider
-                </h2>
-              </div>
-            </div>
-          </div>
-
-          {/* Search and Filters */}
-          <div className="bg-surface-container-lowest p-md md:p-lg rounded-xl border border-outline-variant/30 shadow-sm mb-lg fade-in-up">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-md">
-              <div className="relative flex-1 max-w-md">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">
-                  search
-                </span>
+            <div className="dash-toolbar">
+              <div className="relative flex-1 min-w-[200px]">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 app-text-muted text-lg pointer-events-none">search</span>
                 <input
-                  className="w-full pl-10 pr-md py-sm bg-surface-bright border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none font-body-md transition-all"
-                  placeholder="Rechercher par nom, rôle..."
-                  type="text"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm app-input bg-transparent border-0 focus:outline-none"
+                  placeholder="Rechercher par nom, rôle…"
+                  type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <div className="relative w-full sm:w-48">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
-                  filter_list
-                </span>
-                <select
-                  className="w-full pl-9 pr-8 py-2 bg-surface-bright border border-outline-variant rounded-lg text-xs font-semibold appearance-none focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                >
-                  <option value="all">Tous les statuts</option>
-                  <option value="pending">En attente</option>
-                  <option value="validated">Validés</option>
-                  {selectedEventId && <option value="rejected">Refusés</option>}
-                </select>
-              </div>
             </div>
-          </div>
 
-          {selectedStaffIds.size > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 mb-lg">
-              <span className="text-sm font-medium text-primary">
-                {selectedStaffIds.size} profil{selectedStaffIds.size > 1 ? 's' : ''} sélectionné{selectedStaffIds.size > 1 ? 's' : ''}
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedStaffIds(new Set())}
-                  disabled={isBulkProcessing}
-                  className="rounded-lg border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition disabled:opacity-50"
-                >
-                  Désélectionner
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleBulkStaffAction('validate')}
-                  disabled={isBulkProcessing}
-                  className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 transition disabled:opacity-50"
-                >
-                  Valider la sélection
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleBulkStaffAction('reject')}
-                  disabled={isBulkProcessing}
-                  className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 transition disabled:opacity-50"
-                >
-                  Refuser la sélection
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleBulkStaffAction('delete')}
-                  disabled={isBulkProcessing}
-                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition disabled:opacity-50"
-                >
-                  Supprimer la sélection
-                </button>
+            {selectedStaffIds.size > 0 && (
+              <div className="dash-actions-panel !py-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <span className="text-sm font-semibold app-heading">
+                    {selectedStaffIds.size} profil{selectedStaffIds.size > 1 ? 's' : ''} sélectionné{selectedStaffIds.size > 1 ? 's' : ''}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStaffIds(new Set())}
+                      disabled={isBulkProcessing}
+                      className="landing-chip disabled:opacity-50"
+                    >
+                      Désélectionner
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBulkStaffAction('validate')}
+                      disabled={isBulkProcessing}
+                      className="landing-chip landing-chip--active disabled:opacity-50"
+                    >
+                      {isBulkProcessing ? 'Traitement…' : 'Valider la sélection'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBulkStaffAction('reject')}
+                      disabled={isBulkProcessing}
+                      className="landing-chip border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 disabled:opacity-50"
+                    >
+                      Refuser la sélection
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBulkStaffAction('delete')}
+                      disabled={isBulkProcessing}
+                      className="landing-chip border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400 disabled:opacity-50"
+                    >
+                      Supprimer la sélection
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Staff Table */}
-          {isLoading ? (
-            <TablePageSkeleton rows={8} showFilters />
-          ) : (
-            <StaffTable
-              staffData={filteredStaff}
-              selectedIds={selectedStaffIds}
-              onSelectionChange={setSelectedStaffIds}
-              onRowClick={handleOpenModal}
-              onDeleteStaff={handleDeleteStaff}
-              onValidateStaff={handleValidateStaff}
-              onRejectStaff={handleRejectStaff}
-            />
-          )}
-        {/* Footer */}
-        <footer className="w-full bg-surface-container-low border-t border-outline-variant/30 mt-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-lg px-gutter py-xl max-w-container-max mx-auto">
-            <div>
-              <div className="font-headline-md text-headline-md font-bold text-primary mb-md">
-                ToliarEvent
-              </div>
-              <p className="text-on-surface-variant font-body-md text-body-md">
-                © 2024 ToliarEvent. Precision logistics for the heart of Toliara.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-label-md text-label-md font-bold text-on-surface mb-md">
-                Quick Links
-              </h4>
-              <ul className="space-y-sm">
-                <li>
-                  <a
-                    className="text-on-surface-variant font-body-md text-body-md hover:text-primary underline"
-                    href="#"
-                  >
-                    Privacy Policy
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className="text-on-surface-variant font-body-md text-body-md hover:text-primary underline"
-                    href="#"
-                  >
-                    Terms of Service
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-label-md text-label-md font-bold text-on-surface mb-md">
-                Resources
-              </h4>
-              <ul className="space-y-sm">
-                <li>
-                  <a
-                    className="text-on-surface-variant font-body-md text-body-md hover:text-primary underline"
-                    href="#"
-                  >
-                    Support
-                  </a>
-                </li>
-                <li>
-                  <a
-                    className="text-on-surface-variant font-body-md text-body-md hover:text-primary underline"
-                    href="#"
-                  >
-                    Local Logistics
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-label-md text-label-md font-bold text-on-surface mb-md">
-                Contact
-              </h4>
-              <p className="text-on-surface-variant font-body-md text-body-md">
-                Toliara, Madagascar
-              </p>
-              <p className="text-on-surface-variant font-body-md text-body-md">
-                contact@toliarevent.mg
-              </p>
-            </div>
-          </div>
-        </footer>
+            {isLoading ? (
+              <TablePageSkeleton rows={8} showFilters />
+            ) : (
+              <StaffTable
+                staffData={filteredStaff}
+                selectedIds={selectedStaffIds}
+                onSelectionChange={setSelectedStaffIds}
+                onRowClick={handleOpenModal}
+                onDeleteStaff={handleDeleteStaff}
+                onValidateStaff={handleValidateStaff}
+                onRejectStaff={handleRejectStaff}
+              />
+            )}
+          </section>
+        </div>
       </main>
 
       <StaffModal

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { TablePageSkeleton } from '../components/skeleton';
+import AppPageHeader from '../components/AppPageHeader';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { authAPI } from '../services/authAPI';
@@ -76,10 +77,21 @@ function statusLabel(status: PaymentStatus): string {
 }
 
 function statusClass(status: PaymentStatus): string {
-  if (status === 'validated') return 'bg-emerald-100 text-emerald-800';
-  if (status === 'rejected') return 'bg-red-100 text-red-800';
-  return 'bg-amber-100 text-amber-800';
+  if (status === 'validated') {
+    return 'dash-status-badge bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20';
+  }
+  if (status === 'rejected') {
+    return 'dash-status-badge bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/20';
+  }
+  return 'dash-status-badge bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20';
 }
+
+const FILTER_OPTIONS: Array<{ value: 'all' | PaymentStatus; label: string }> = [
+  { value: 'pending', label: 'En attente' },
+  { value: 'validated', label: 'Validées' },
+  { value: 'rejected', label: 'Refusées' },
+  { value: 'all', label: 'Toutes' },
+];
 
 export default function OrderManagement({ selectedEventId }: { selectedEventId: string | null }) {
   const { session, user } = useAuth();
@@ -320,164 +332,166 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
 
   if (!selectedEventId) {
     return (
-      <div className="flex-1 overflow-y-auto px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen">
-        <div className="rounded-2xl border border-outline-variant/30 bg-surface p-8 text-center text-on-surface-variant">
-          Sélectionnez un événement pour consulter les commandes en ligne.
+      <main className="dash-page flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-screen">
+        <div className="relative z-10 max-w-container-max mx-auto px-gutter pb-12 pt-24 md:pt-28">
+          <div className="dash-empty-state">
+            <span className="material-symbols-outlined text-4xl text-primary/70 mb-3">shopping_cart</span>
+            <p className="font-landing-display text-lg app-heading mb-1">Aucun événement sélectionné</p>
+            <p className="text-sm app-text-muted">
+              Sélectionnez un événement pour consulter les commandes en ligne.
+            </p>
+          </div>
         </div>
-      </div>
+      </main>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <main className="dash-page flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-screen">
+        <div className="relative z-10 max-w-container-max mx-auto px-gutter pb-12 pt-24 md:pt-28">
+          <TablePageSkeleton rows={6} kpiCount={4} showFilters />
+        </div>
+      </main>
     );
   }
 
   return (
-    <>
-      {isLoading ? (
-        <div className="flex-1 overflow-y-auto px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen">
-          <TablePageSkeleton rows={6} kpiCount={4} showFilters />
-        </div>
-      ) : (
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-xl pb-xl pt-24 md:pt-28 min-h-screen space-y-6">
-        <div className="rounded-3xl border border-outline-variant/30 bg-surface p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-on-surface">Commandes en ligne</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Suivez les achats Mobile Money et validez les paiements pour activer la vente des billets.
-          </p>
-        </div>
+    <main className="dash-page flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-screen">
+      <div className="relative z-10 max-w-container-max mx-auto px-gutter pb-12 pt-24 md:pt-28 space-y-8">
+        <AppPageHeader
+          title="Commandes en ligne"
+          subtitle="Suivez les achats Mobile Money et validez les paiements pour activer la vente des billets."
+        />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
-            <div>
-              <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">
-                En attente
-              </span>
-              <span className="block text-xl font-bold mt-1">{kpis.pending_orders}</span>
-              <span className="block text-xs text-on-surface-variant mt-1">
-                {formatAmount(kpis.pending_amount)}
-              </span>
+        <section>
+          <p className="landing-eyebrow mb-4">Vue d&apos;ensemble</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="dash-stat-card">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="dash-stat-label mb-1">En attente</p>
+                  <p className="dash-stat-value">{kpis.pending_orders.toLocaleString('fr-FR')}</p>
+                  <p className="text-xs app-text-muted mt-1">{formatAmount(kpis.pending_amount)}</p>
+                </div>
+                <span className="material-symbols-outlined text-2xl text-amber-500 opacity-80">hourglass_top</span>
+              </div>
             </div>
-            <span className="material-symbols-outlined text-amber-600 text-lg bg-amber-100 p-2 rounded-lg">
-              hourglass_top
-            </span>
+            <div className="dash-stat-card">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="dash-stat-label mb-1">Validées</p>
+                  <p className="dash-stat-value">{kpis.validated_orders.toLocaleString('fr-FR')}</p>
+                  <p className="text-xs app-text-muted mt-1">{formatAmount(kpis.validated_revenue)}</p>
+                </div>
+                <span className="material-symbols-outlined text-2xl text-emerald-500 opacity-80">check_circle</span>
+              </div>
+            </div>
+            <div className="dash-stat-card">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="dash-stat-label mb-1">Billets en attente</p>
+                  <p className="dash-stat-value">{kpis.pending_tickets.toLocaleString('fr-FR')}</p>
+                </div>
+                <span className="material-symbols-outlined text-2xl text-primary opacity-80">confirmation_number</span>
+              </div>
+            </div>
+            <div className="dash-stat-card">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="dash-stat-label mb-1">Total commandes</p>
+                  <p className="dash-stat-value">{kpis.total_orders.toLocaleString('fr-FR')}</p>
+                </div>
+                <span className="material-symbols-outlined text-2xl text-indigo-500 opacity-80">shopping_cart</span>
+              </div>
+            </div>
           </div>
+        </section>
 
-          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
+        <section className="space-y-5">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
             <div>
-              <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">
-                Validées
-              </span>
-              <span className="block text-xl font-bold mt-1">{kpis.validated_orders}</span>
-              <span className="block text-xs text-on-surface-variant mt-1">
-                {formatAmount(kpis.validated_revenue)}
-              </span>
+              <p className="landing-eyebrow mb-2">Registre</p>
+              <div className="flex items-center gap-2">
+                <h2 className="font-landing-display text-xl app-heading">Liste des commandes</h2>
+                {pendingHighlight && filter !== 'pending' && (
+                  <span className="inline-flex h-2 w-2 rounded-full bg-amber-500" title="Commandes en attente" />
+                )}
+              </div>
             </div>
-            <span className="material-symbols-outlined text-emerald-600 text-lg bg-emerald-100 p-2 rounded-lg">
-              check_circle
-            </span>
-          </div>
-
-          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
-            <div>
-              <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">
-                Billets en attente
-              </span>
-              <span className="block text-xl font-bold mt-1">{kpis.pending_tickets}</span>
-            </div>
-            <span className="material-symbols-outlined text-primary text-lg bg-primary/5 p-2 rounded-lg">
-              confirmation_number
-            </span>
-          </div>
-
-          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex items-center justify-between">
-            <div>
-              <span className="block text-outline text-[10px] uppercase tracking-widest font-semibold">
-                Total commandes
-              </span>
-              <span className="block text-xl font-bold mt-1">{kpis.total_orders}</span>
-            </div>
-            <span className="material-symbols-outlined text-secondary text-lg bg-secondary/5 p-2 rounded-lg">
-              shopping_cart
-            </span>
-          </div>
-        </div>
-
-        <section className="space-y-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-outline-variant/20 pb-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-bold text-on-surface">Liste des commandes</h3>
-              {pendingHighlight && filter !== 'pending' && (
-                <span className="inline-flex h-2 w-2 rounded-full bg-amber-500" title="Commandes en attente" />
-              )}
-            </div>
-            <div className="relative w-full sm:w-56">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-md">
-                filter_list
-              </span>
-              <select
-                className="w-full pl-9 pr-8 py-2 bg-white border border-outline-variant/50 rounded-xl text-xs font-semibold appearance-none focus:border-primary focus:outline-none transition-all text-on-surface"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as typeof filter)}
-              >
-                <option value="pending">En attente</option>
-                <option value="validated">Validées</option>
-                <option value="rejected">Refusées</option>
-                <option value="all">Toutes</option>
-              </select>
+            <div className="flex flex-wrap gap-2">
+              {FILTER_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFilter(option.value)}
+                  className={`landing-chip ${filter === option.value ? 'landing-chip--active' : ''}`}
+                >
+                  {option.label}
+                  {option.value === 'pending' && kpis.pending_orders > 0 && (
+                    <span className="ml-1 opacity-80">({kpis.pending_orders})</span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
 
           {selectedOrderIds.size > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-              <span className="text-sm font-medium text-primary">
-                {selectedOrderIds.size} commande{selectedOrderIds.size > 1 ? 's' : ''} sélectionnée{selectedOrderIds.size > 1 ? 's' : ''}
-                {selectedPendingCount > 0 && ` · ${selectedPendingCount} en attente`}
-                {selectedValidatedCount > 0 && ` · ${selectedValidatedCount} validée${selectedValidatedCount > 1 ? 's' : ''}`}
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOrderIds(new Set())}
-                  disabled={isBulkProcessing}
-                  className="rounded-lg border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition disabled:opacity-50"
-                >
-                  Désélectionner
-                </button>
-                {selectedPendingCount > 0 && (
+            <div className="dash-actions-panel !py-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <span className="text-sm font-semibold app-heading">
+                  {selectedOrderIds.size} commande{selectedOrderIds.size > 1 ? 's' : ''} sélectionnée{selectedOrderIds.size > 1 ? 's' : ''}
+                  {selectedPendingCount > 0 && ` · ${selectedPendingCount} en attente`}
+                  {selectedValidatedCount > 0 && ` · ${selectedValidatedCount} validée${selectedValidatedCount > 1 ? 's' : ''}`}
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleBulkValidate}
+                    onClick={() => setSelectedOrderIds(new Set())}
                     disabled={isBulkProcessing}
-                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 transition disabled:opacity-50"
+                    className="landing-chip disabled:opacity-50"
                   >
-                    {isBulkProcessing ? 'Traitement...' : 'Valider la sélection'}
+                    Désélectionner
                   </button>
-                )}
-                {selectedValidatedCount > 0 && (
+                  {selectedPendingCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBulkValidate}
+                      disabled={isBulkProcessing}
+                      className="landing-chip landing-chip--active disabled:opacity-50"
+                    >
+                      {isBulkProcessing ? 'Traitement…' : 'Valider la sélection'}
+                    </button>
+                  )}
+                  {selectedValidatedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBulkDevalidate}
+                      disabled={isBulkProcessing}
+                      className="landing-chip border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 disabled:opacity-50"
+                    >
+                      {isBulkProcessing ? 'Traitement…' : 'Dévalider la sélection'}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={handleBulkDevalidate}
+                    onClick={handleBulkDelete}
                     disabled={isBulkProcessing}
-                    className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition disabled:opacity-50"
+                    className="landing-chip border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400 disabled:opacity-50"
                   >
-                    {isBulkProcessing ? 'Traitement...' : 'Dévalider la sélection'}
+                    Supprimer la sélection
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleBulkDelete}
-                  disabled={isBulkProcessing}
-                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition disabled:opacity-50"
-                >
-                  Supprimer la sélection
-                </button>
+                </div>
               </div>
             </div>
           )}
 
-          <div className="rounded-2xl border border-outline-variant/30 bg-surface overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-surface-container-low text-left text-on-surface-variant">
-                  <tr>
-                    <th className="px-4 py-3 w-10">
+          <div className="app-card rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full min-w-max text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--md-border)] bg-[var(--md-surface-muted)]">
+                    <th className="px-4 py-3.5 w-10">
                       <input
                         type="checkbox"
                         checked={allSelected}
@@ -485,31 +499,34 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                           if (el) el.indeterminate = someSelected && !allSelected;
                         }}
                         onChange={toggleSelectAll}
-                        className="h-4 w-4 rounded border-outline-variant/50 text-primary focus:ring-primary/30 cursor-pointer"
+                        className="h-4 w-4 rounded border-[var(--md-border)] text-primary focus:ring-primary/30 cursor-pointer accent-[var(--landing-primary)]"
                         aria-label="Tout sélectionner"
                       />
                     </th>
-                    <th className="px-4 py-3 font-semibold">Date</th>
-                    <th className="px-4 py-3 font-semibold">Acheteur</th>
-                    <th className="px-4 py-3 font-semibold">Réf. transaction</th>
-                    <th className="px-4 py-3 font-semibold">Montant</th>
-                    <th className="px-4 py-3 font-semibold">Billets</th>
-                    <th className="px-4 py-3 font-semibold">Statut</th>
-                    <th className="px-4 py-3 font-semibold">Action</th>
+                    <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Date</th>
+                    <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Acheteur</th>
+                    <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Réf. transaction</th>
+                    <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Montant</th>
+                    <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Billets</th>
+                    <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Statut</th>
+                    <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-[var(--md-border)]">
                   {orders.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-on-surface-variant">
-                        Aucune commande pour ce filtre.
+                      <td colSpan={8} className="px-5 py-14 text-center">
+                        <div className="dash-empty-state !p-8 !max-w-sm">
+                          <span className="material-symbols-outlined text-3xl app-text-muted mb-2">inbox</span>
+                          <p className="text-sm app-text-muted">Aucune commande pour ce filtre.</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
                     orders.map((order) => (
                       <tr
                         key={order.id}
-                        className={`border-t border-outline-variant/20 ${
+                        className={`hover:bg-[var(--md-surface-muted)]/60 transition-colors ${
                           selectedOrderIds.has(order.id) ? 'bg-primary/5' : ''
                         }`}
                       >
@@ -518,32 +535,30 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                             type="checkbox"
                             checked={selectedOrderIds.has(order.id)}
                             onChange={() => toggleSelectOne(order.id)}
-                            className="h-4 w-4 rounded border-outline-variant/50 text-primary focus:ring-primary/30 cursor-pointer"
+                            className="h-4 w-4 rounded border-[var(--md-border)] text-primary focus:ring-primary/30 cursor-pointer accent-[var(--landing-primary)]"
                             aria-label={`Sélectionner commande ${order.transaction_id}`}
                           />
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap">{formatDate(order.created_at)}</td>
-                        <td className="px-4 py-4">
-                          <div className="font-semibold text-on-surface">{order.buyer_name}</div>
-                          <div className="text-xs text-on-surface-variant">{order.buyer_phone}</div>
+                        <td className="px-5 py-4 whitespace-nowrap text-sm app-text-muted">{formatDate(order.created_at)}</td>
+                        <td className="px-5 py-4">
+                          <div className="font-semibold app-heading">{order.buyer_name}</div>
+                          <div className="text-xs app-text-muted mt-0.5">{order.buyer_phone}</div>
                           {order.buyer_email && (
-                            <div className="text-xs text-on-surface-variant">{order.buyer_email}</div>
+                            <div className="text-xs app-text-muted">{order.buyer_email}</div>
                           )}
                         </td>
-                        <td className="px-4 py-4">
-                          <div className="font-mono text-xs">{order.transaction_id}</div>
+                        <td className="px-5 py-4">
+                          <div className="font-mono text-xs app-heading">{order.transaction_id}</div>
                           {order.payment_method && (
-                            <div className="text-xs text-on-surface-variant mt-1">
-                              {order.payment_method.Operateur}
-                            </div>
+                            <div className="text-xs app-text-muted mt-1">{order.payment_method.Operateur}</div>
                           )}
                         </td>
-                        <td className="px-4 py-4 font-semibold whitespace-nowrap">
+                        <td className="px-5 py-4 font-semibold whitespace-nowrap app-heading">
                           {formatAmount(Number(order.total_amount))}
                         </td>
-                        <td className="px-4 py-4">
-                          <div className="font-semibold">{order.ticket_count} billet(s)</div>
-                          <div className="text-xs text-on-surface-variant mt-1 space-y-0.5">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-sm app-heading">{order.ticket_count} billet(s)</div>
+                          <div className="text-xs app-text-muted mt-1 space-y-0.5">
                             {order.tickets.slice(0, 3).map((ticket) => (
                               <div key={ticket.id}>
                                 #{ticket.number ?? '—'} · {ticket.ticket_type}
@@ -554,77 +569,54 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(order.payment_status)}`}
-                          >
+                        <td className="px-5 py-4">
+                          <span className={statusClass(order.payment_status)}>
                             {statusLabel(order.payment_status)}
                           </span>
                         </td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap items-center gap-2">
+                        <td className="px-5 py-4">
+                          <div className="dash-action-group w-fit">
                             {order.payment_status === 'pending' && (
                               <button
                                 type="button"
+                                title="Valider le paiement"
                                 onClick={() => handleValidate(order.id)}
                                 disabled={validatingId === order.id || deletingId === order.id || isBulkProcessing}
-                                className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-60"
+                                className="dash-action-btn dash-action-btn--primary disabled:opacity-50"
                               >
                                 {validatingId === order.id ? (
-                                  <>
-                                    <span className="material-symbols-outlined text-sm animate-spin">
-                                      progress_activity
-                                    </span>
-                                    Validation...
-                                  </>
+                                  <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
                                 ) : (
-                                  <>
-                                    <span className="material-symbols-outlined text-sm">verified</span>
-                                    Valider
-                                  </>
+                                  <span className="material-symbols-outlined text-lg">verified</span>
                                 )}
                               </button>
                             )}
                             {order.payment_status === 'validated' && (
                               <button
                                 type="button"
+                                title="Dévalider"
                                 onClick={() => handleDevalidate(order.id)}
                                 disabled={devalidatingId === order.id || deletingId === order.id || validatingId === order.id || isBulkProcessing}
-                                className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                                className="dash-action-btn disabled:opacity-50 text-amber-600 hover:bg-amber-500/10"
                               >
                                 {devalidatingId === order.id ? (
-                                  <>
-                                    <span className="material-symbols-outlined text-sm animate-spin">
-                                      progress_activity
-                                    </span>
-                                    Dévalidation...
-                                  </>
+                                  <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
                                 ) : (
-                                  <>
-                                    <span className="material-symbols-outlined text-sm">undo</span>
-                                    Dévalider
-                                  </>
+                                  <span className="material-symbols-outlined text-lg">undo</span>
                                 )}
                               </button>
                             )}
                             <button
                               type="button"
+                              title="Supprimer"
                               onClick={() => handleDelete(order)}
                               disabled={deletingId === order.id || validatingId === order.id || devalidatingId === order.id || isBulkProcessing}
-                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                              className="dash-action-btn dash-action-btn--danger disabled:opacity-50"
                             >
                               {deletingId === order.id ? (
-                                <>
-                                  <span className="material-symbols-outlined text-sm animate-spin">
-                                    progress_activity
-                                  </span>
-                                  Suppression...
-                                </>
+                                <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
                               ) : (
-                                <>
-                                  <span className="material-symbols-outlined text-sm">delete</span>
-                                  Supprimer
-                                </>
+                                <span className="material-symbols-outlined text-lg">delete</span>
                               )}
                             </button>
                           </div>
@@ -635,16 +627,21 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                 </tbody>
               </table>
             </div>
-            <div className="px-4 py-3 bg-surface-container-low border-t border-outline-variant/30 text-xs text-on-surface-variant">
-              {orders.length === 0
-                ? 'Aucune commande affichée'
-                : `${orders.length} commande${orders.length > 1 ? 's' : ''} affichée${orders.length > 1 ? 's' : ''}`}
-              {selectedOrderIds.size > 0 && ` · ${selectedOrderIds.size} sélectionnée${selectedOrderIds.size > 1 ? 's' : ''}`}
+            <div className="px-5 py-3 border-t border-[var(--md-border)] bg-[var(--md-surface-muted)] text-xs app-text-muted flex flex-wrap items-center justify-between gap-2">
+              <span>
+                {orders.length === 0
+                  ? 'Aucune commande affichée'
+                  : `${orders.length} commande${orders.length > 1 ? 's' : ''} affichée${orders.length > 1 ? 's' : ''}`}
+              </span>
+              {selectedOrderIds.size > 0 && (
+                <span className="font-medium text-primary">
+                  {selectedOrderIds.size} sélectionnée{selectedOrderIds.size > 1 ? 's' : ''}
+                </span>
+              )}
             </div>
           </div>
         </section>
       </div>
-      )}
-    </>
+    </main>
   );
 }

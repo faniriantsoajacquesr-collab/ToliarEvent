@@ -1,5 +1,3 @@
-import { Check, X, Trash2 } from 'lucide-react';
-
 export interface StaffRow {
   id: number;
   status: string;
@@ -21,6 +19,24 @@ interface StaffTableProps {
   onDeleteStaff?: (memberId: number) => void;
   onValidateStaff?: (memberId: number) => void;
   onRejectStaff?: (memberId: number) => void;
+}
+
+function getStatusClass(status: string): string {
+  const normalized = String(status).toLowerCase();
+  if (normalized === 'valide' || normalized === 'accepted') {
+    return 'dash-status-badge bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20';
+  }
+  if (normalized === 'en_attente' || normalized === 'pending') {
+    return 'dash-status-badge bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20';
+  }
+  if (normalized === 'refuse' || normalized === 'rejected') {
+    return 'dash-status-badge bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/20';
+  }
+  return 'dash-status-badge bg-[var(--md-surface-muted)] app-text-muted border border-[var(--md-border)]';
+}
+
+function formatStatusLabel(status: string): string {
+  return String(status ?? '').replace(/_/g, ' ') || '—';
 }
 
 export default function StaffTable({
@@ -57,30 +73,14 @@ export default function StaffTable({
     onSelectionChange!(next);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'valide':
-      case 'accepted':
-        return 'bg-green-100 text-green-800';
-      case 'en_attente':
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'refuse':
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
-    <div className="w-full bg-surface rounded-2xl border border-outline-variant overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+    <div className="app-card rounded-2xl overflow-hidden">
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full min-w-max text-left border-collapse text-sm">
           <thead>
-            <tr className="border-b border-outline-variant bg-surface-container-low text-label-md font-bold text-on-surface-variant uppercase tracking-wider">
+            <tr className="border-b border-[var(--md-border)] bg-[var(--md-surface-muted)]">
               {selectionEnabled && (
-                <th className="px-4 py-4 w-10">
+                <th className="px-4 py-3.5 w-10">
                   <input
                     type="checkbox"
                     checked={allSelected}
@@ -88,33 +88,33 @@ export default function StaffTable({
                       if (el) el.indeterminate = someSelected && !allSelected;
                     }}
                     onChange={toggleSelectAll}
-                    className="h-4 w-4 rounded border-outline-variant/50 text-primary focus:ring-primary/30 cursor-pointer"
+                    className="h-4 w-4 rounded border-[var(--md-border)] text-primary focus:ring-primary/30 cursor-pointer accent-[var(--landing-primary)]"
                     aria-label="Tout sélectionner"
                   />
                 </th>
               )}
-              <th className="px-6 py-4">Nom complet</th>
-              <th className="px-6 py-4">Poste Recruté</th>
-              <th className="px-6 py-4">Téléphone</th>
-              <th className="px-6 py-4">Statut</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Nom complet</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Poste recruté</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Téléphone</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted">Statut</th>
+              <th className="px-5 py-3.5 text-[10px] font-bold uppercase tracking-wider app-text-muted text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-outline-variant">
+          <tbody className="divide-y divide-[var(--md-border)]">
             {staffData.length === 0 ? (
               <tr>
-                <td
-                  colSpan={selectionEnabled ? 6 : 5}
-                  className="px-6 py-10 text-center text-sm text-on-surface-variant"
-                >
-                  Aucun profil trouvé pour ce filtre.
+                <td colSpan={selectionEnabled ? 6 : 5} className="px-5 py-14 text-center">
+                  <div className="dash-empty-state !p-8 !max-w-sm mx-auto">
+                    <span className="material-symbols-outlined text-3xl app-text-muted mb-2">group_off</span>
+                    <p className="text-sm app-text-muted">Aucun profil trouvé pour ce filtre.</p>
+                  </div>
                 </td>
               </tr>
             ) : (
               staffData.map((staff) => (
                 <tr
                   key={staff.id}
-                  className={`hover:bg-surface-container-low transition-colors cursor-pointer ${
+                  className={`hover:bg-[var(--md-surface-muted)]/60 transition-colors cursor-pointer ${
                     selectionEnabled && selectedIds!.has(staff.id) ? 'bg-primary/5' : ''
                   }`}
                   onClick={() => onRowClick(staff)}
@@ -125,56 +125,62 @@ export default function StaffTable({
                         type="checkbox"
                         checked={selectedIds!.has(staff.id)}
                         onChange={() => toggleSelectOne(staff.id)}
-                        className="h-4 w-4 rounded border-outline-variant/50 text-primary focus:ring-primary/30 cursor-pointer"
+                        className="h-4 w-4 rounded border-[var(--md-border)] text-primary focus:ring-primary/30 cursor-pointer accent-[var(--landing-primary)]"
                         aria-label={`Sélectionner ${staff.profile?.first_name || 'membre'}`}
                       />
                     </td>
                   )}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-on-surface">
+                  <td className="px-5 py-4 whitespace-nowrap font-semibold app-heading">
                     {staff.profile
-                      ? `${staff.profile.first_name || ''} ${staff.profile.last_name || ''}`.trim() || 'Sans Nom'
+                      ? `${staff.profile.first_name || ''} ${staff.profile.last_name || ''}`.trim() || 'Sans nom'
                       : 'Compte sans profil'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-on-surface-variant">
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                  <td className="px-5 py-4 whitespace-nowrap">
+                    <span className="dash-status-badge bg-primary/10 text-primary border border-primary/20">
                       {staff.post}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-on-surface-variant">
+                  <td className="px-5 py-4 whitespace-nowrap app-text-muted">
                     {staff.profile?.phone || '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(staff.status || '')}`}>
-                      {String(staff.status ?? '').replace(/_/g, ' ') || '—'}
+                  <td className="px-5 py-4 whitespace-nowrap">
+                    <span className={getStatusClass(staff.status || '')}>
+                      {formatStatusLabel(staff.status)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                    <div className="inline-flex items-center gap-2">
+                  <td className="px-5 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="dash-action-group w-fit ml-auto">
                       {onValidateStaff && staff.status !== 'valide' && (
                         <button
-                          className="text-green-600 hover:text-green-800 p-2 rounded-full hover:bg-green-100 transition-colors"
+                          type="button"
+                          title="Valider"
+                          className="dash-action-btn dash-action-btn--primary"
                           aria-label="Valider"
                           onClick={() => onValidateStaff(staff.id)}
                         >
-                          <Check size={18} />
+                          <span className="material-symbols-outlined text-lg">check_circle</span>
                         </button>
                       )}
                       {onRejectStaff && staff.status !== 'refuse' && (
                         <button
-                          className="text-orange-600 hover:text-orange-800 p-2 rounded-full hover:bg-orange-100 transition-colors"
+                          type="button"
+                          title="Refuser"
+                          className="dash-action-btn text-amber-600 hover:bg-amber-500/10"
                           aria-label="Refuser"
                           onClick={() => onRejectStaff(staff.id)}
                         >
-                          <X size={18} />
+                          <span className="material-symbols-outlined text-lg">cancel</span>
                         </button>
                       )}
                       {onDeleteStaff && (
                         <button
-                          className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition-colors"
+                          type="button"
+                          title="Supprimer"
+                          className="dash-action-btn dash-action-btn--danger"
                           aria-label="Supprimer"
                           onClick={() => onDeleteStaff(staff.id)}
                         >
-                          <Trash2 size={18} />
+                          <span className="material-symbols-outlined text-lg">delete</span>
                         </button>
                       )}
                     </div>
@@ -185,11 +191,17 @@ export default function StaffTable({
           </tbody>
         </table>
       </div>
-      <div className="px-6 py-3 bg-surface-container-low border-t border-outline-variant text-xs text-on-surface-variant">
-        {staffData.length === 0
-          ? 'Aucun profil affiché'
-          : `${staffData.length} profil${staffData.length > 1 ? 's' : ''} affiché${staffData.length > 1 ? 's' : ''}`}
-        {selectionEnabled && selectedIds!.size > 0 && ` · ${selectedIds!.size} sélectionné${selectedIds!.size > 1 ? 's' : ''}`}
+      <div className="px-5 py-3 border-t border-[var(--md-border)] bg-[var(--md-surface-muted)] text-xs app-text-muted flex flex-wrap items-center justify-between gap-2">
+        <span>
+          {staffData.length === 0
+            ? 'Aucun profil affiché'
+            : `${staffData.length} profil${staffData.length > 1 ? 's' : ''} affiché${staffData.length > 1 ? 's' : ''}`}
+        </span>
+        {selectionEnabled && selectedIds!.size > 0 && (
+          <span className="font-medium text-primary">
+            {selectedIds!.size} sélectionné{selectedIds!.size > 1 ? 's' : ''}
+          </span>
+        )}
       </div>
     </div>
   );
