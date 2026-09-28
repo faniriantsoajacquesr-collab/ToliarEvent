@@ -5,6 +5,7 @@ import ContactSection from '../components/home/ContactSection';
 import ticketsVisual from '../assets/demo/tickets-print-visual.png';
 import publicationDemo from '../assets/demo/event-page-demo.png';
 import scanVisual from '../assets/demo/ticket-scan-visual.png';
+import heroImage from '../assets/hero.png';
 import './Home.css';
 import './OrganizersPage.css';
 
@@ -44,7 +45,7 @@ export default function OrganizersPage() {
             <div className="pro-actions"><button type="button" className="landing-btn-primary" onClick={createEvent}>{isAuthenticated ? 'Accéder à mon espace' : 'Demander un accès anticipé'} <Icon name="arrow_forward" /></button><a href="#parcours-pro" className="landing-btn-secondary">Découvrir ToliarEvent</a></div>
             <p className="pro-local landing-text-muted"><Icon name="location_on" /> Accès sur invitation · Places limitées pendant la phase de test</p>
           </div>
-          <div className="pro-hero-visual" aria-hidden="true"><div className="pro-orbit" /><div className="pro-pass"><span className="pro-pass-label">TOLIAREVENT / PRO</span><Icon name="local_activity" /><strong>Du premier billet<br />au dernier scan.</strong><div className="pro-pass-bottom"><span>Publier · Vendre · Imprimer<br />Scanner · Gérer</span><Icon name="qr_code_2" /></div></div><span className="pro-floating"><Icon name="event_available" /> Votre événement, votre espace.</span></div>
+          <div className="home-logo-scene"><img src={heroImage} alt="ToliarEvent — Gérez, organisez, publiez, vivez l’événement." width={1254} height={1254} fetchPriority="high" className="home-logo-art" /></div>
         </div>
       </section>
       <section id="parcours-pro" className="pro-journey landing-container" aria-labelledby="pro-journey-title">

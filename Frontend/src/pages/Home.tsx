@@ -5,7 +5,7 @@ import { normalizeHash, scrollToSection } from '../hooks/usePublicNav';
 import { authAPI } from '../services/authAPI';
 import DashboardPreview from '../components/home/DashboardPreview';
 import ContactSection from '../components/home/ContactSection';
-import heroLogo from '../assets/Logo hero section.png';
+import heroLogo from '../assets/hero.png';
 import './Home.css';
 
 type PublicEvent = { id: string; title: string; start_date: string; location?: string; image_url?: string; event_categories?: { name: string } | null };
@@ -78,9 +78,7 @@ export default function Home() {
             </div>
           </div>
           <div className="home-logo-scene">
-            <div className="home-logo-glass">
-              <img src={heroLogo} alt="ToliarEvent — Gérez, organisez, publiez, vivez l’événement." width={1254} height={1254} fetchPriority="high" className="home-logo-art" />
-            </div>
+            <img src={heroLogo} alt="ToliarEvent — Gérez, organisez, publiez, vivez l’événement." width={1254} height={1254} fetchPriority="high" className="home-logo-art" />
           </div>
         </div>
       </section>

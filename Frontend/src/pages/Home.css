@@ -141,10 +141,8 @@ body:has(.home-public) .landing-footer { background: var(--landing-bg-section); 
   .home-public *, .home-public *::before, .home-public *::after { animation: none !important; transition: none !important; }
 }
 
-/* Frameless artwork: an organic halo and a soft elliptical fade. */
+/* Hero artwork without a halo or fading mask. */
 .home-logo-scene { position: relative; isolation: isolate; width: 100%; max-width: 520px; margin: 36px auto 0; }
-.home-logo-scene::before { content: ''; position: absolute; inset: 8% -5% 5%; z-index: -1; border-radius: 43% 57% 62% 38%; background: radial-gradient(ellipse at 28% 62%, #2563eb30, transparent 65%), radial-gradient(ellipse at 75% 30%, #8b5cf62b, transparent 65%); filter: blur(42px); }
-.home-logo-glass { position: relative; }
-.home-logo-art { display: block; width: 100%; height: auto; mask-image: radial-gradient(ellipse 50% 49% at 50% 48%, #000 45%, #000e 62%, #0006 80%, transparent 100%); -webkit-mask-image: radial-gradient(ellipse 50% 49% at 50% 48%, #000 45%, #000e 62%, #0006 80%, transparent 100%); }
+.home-logo-art { display: block; width: 100%; height: auto; }
 @media (min-width: 1024px) { .home-logo-scene { margin-top: 0; } }
 @media (max-width: 767px) { .home-logo-scene { max-width: 340px; margin-top: 32px; } }
