@@ -142,7 +142,7 @@ export default function LoginPage() {
 
           <Link to="/signup" className="text-primary font-semibold hover:underline">
 
-            S&apos;inscrire
+            Demander un accès
 
           </Link>
 

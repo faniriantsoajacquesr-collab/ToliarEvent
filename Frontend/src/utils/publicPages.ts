@@ -1,6 +1,6 @@
 /** Marketing pages with full hero + landing background */
 export function isMarketingPage(pathname: string): boolean {
-  return pathname === '/' || pathname === '/evenements';
+  return pathname === '/' || pathname === '/evenements' || pathname === '/organisateurs';
 }
 
 /** All public shell pages (TopBar + Footer + themed tokens) */

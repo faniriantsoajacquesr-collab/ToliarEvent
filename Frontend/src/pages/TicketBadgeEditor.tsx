@@ -377,11 +377,11 @@ export default function TicketBadgeEditor() {
   const [modalOpen, setModalOpen] = useState(false);
   const [orgEvents, setOrgEvents] = useState<any[]>([]);
   const [selectedEventForGen, setSelectedEventForGen] = useState<string | null>(null);
-  const [ticketPrice, setTicketPrice] = useState<number>(0); // New state for ticket price
   const [ticketCount, setTicketCount] = useState<number>(1);
   // Ticket types are loaded per-event; support dynamic custom types
-  const [ticketTypes, setTicketTypes] = useState<Array<{ id: string; name: string }>>([]);
-  const [ticketType, setTicketType] = useState<string | null>('standard');
+  const [ticketTypes, setTicketTypes] = useState<Array<{ id: string; name: string; price: number; currency?: string }>>([]);
+  const [ticketType, setTicketType] = useState<string | null>(null);
+  const selectedTicketType = ticketTypes.find(type => type.id === ticketType);
   const [addingTypeOpen, setAddingTypeOpen] = useState(false);
   const [newTicketTypeName, setNewTicketTypeName] = useState('');
   const [addingTypeLoading, setAddingTypeLoading] = useState(false);
@@ -408,16 +408,7 @@ export default function TicketBadgeEditor() {
     setOrgEvents(evRes.events || []);
     setSelectedEventForGen(orgRes.organization && evRes.events && evRes.events[0] ? evRes.events[0].id : null);
     setModalOpen(true);
-    // fetch ticket types for initial selected event
-    if (orgRes.organization && evRes.events && evRes.events[0]) {
-      const initialEventId = evRes.events[0].id;
-      try {
-        const typesRes = await authAPI.getTicketTypes(initialEventId, session?.access_token || '');
-        if (typesRes.success) setTicketTypes(typesRes.ticket_types || []);
-      } catch (e) {
-        console.warn('Failed to load ticket types', e);
-      }
-    }
+
   };
 
   const b64ToBlob = (b64Data: string, contentType = '', sliceSize = 512) => {
@@ -436,7 +427,7 @@ export default function TicketBadgeEditor() {
   const handleGenerate = async () => {
     if (!selectedEventForGen) { showToast('Sélectionnez un événement', 'error'); return; }
     if (!ticketCount || ticketCount <= 0) { showToast('Nombre de billets invalide', 'error'); return; }
-    if (ticketPrice < 0) { showToast('Le prix du billet ne peut pas être négatif', 'error'); return; }
+    if (!selectedTicketType) { showToast('Sélectionnez un type de billet', 'error'); return; }
     
     setGenPhase('running');
     setGenLog([]);
@@ -465,8 +456,8 @@ export default function TicketBadgeEditor() {
       const payload = { 
         event_id: selectedEventForGen, 
         count: ticketCount, 
-        ticket_type: ticketType, 
-        price: ticketPrice,
+        ticket_type: selectedTicketType.name,
+        ticket_type_id: selectedTicketType.id,
         design_image_data: imageData,
         config: serializeGenerationConfig(config, {
           widthMm: currentDims.widthMm,
@@ -503,19 +494,26 @@ export default function TicketBadgeEditor() {
     }
   };
 
-  // Fetch ticket types when selected event for generation changes
+  // Ignore responses from an event that is no longer selected.
   useEffect(() => {
+    let cancelled = false;
     const loadTypes = async () => {
       if (!selectedEventForGen || !session?.access_token) return;
       try {
-        const typesRes = await authAPI.getTicketTypes(selectedEventForGen, session.access_token);
-        if (typesRes.success) setTicketTypes(typesRes.ticket_types || []);
-      } catch (e) {
-        console.warn('Erreur chargement ticket types', e);
+        const result = await authAPI.getTicketTypes(selectedEventForGen, session.access_token);
+        if (!cancelled) {
+          const types = result.success ? result.ticket_types || [] : [];
+          setTicketTypes(types);
+          setTicketType(types[0]?.id || null);
+        }
+      } catch (error) {
+        if (!cancelled) { setTicketTypes([]); setTicketType(null); }
+        console.warn('Erreur chargement des tarifs', error);
       }
     };
     loadTypes();
-  }, [selectedEventForGen, session]);
+    return () => { cancelled = true; };
+  }, [selectedEventForGen, session?.access_token]);
 
   const addNewTicketType = async () => {
     if (!selectedEventForGen) { showToast('Choisissez d\'abord un événement', 'error'); return; }
@@ -807,7 +805,7 @@ export default function TicketBadgeEditor() {
             </div>
 
             <button type="button" className="badge-editor-cta mt-auto" onClick={handleOpenModal} disabled={genPhase === 'running'}>
-              Continuer
+              Générer les billets
             </button>
           </aside>
 
@@ -1065,14 +1063,14 @@ export default function TicketBadgeEditor() {
               <div className="space-y-4">
                 <div>
                   <label className="badge-field-label">Événement</label>
-                  <select className="badge-select" value={selectedEventForGen || ''} onChange={(e) => setSelectedEventForGen(e.target.value)}>
+                  <select className="badge-select" value={selectedEventForGen || ''} onChange={(e) => { setTicketTypes([]); setTicketType(null); setSelectedEventForGen(e.target.value); }}>
                     <option value="">— Sélectionnez —</option>
                     {orgEvents.map((ev) => <option key={ev.id} value={ev.id}>{ev.title || ev.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="badge-field-label">Prix du billet (€)</label>
-                  <input type="number" min={0} step="0.01" value={ticketPrice} onChange={(e) => setTicketPrice(Number(e.target.value))} className="badge-input" />
+                  <span className="badge-field-label">Tarif du type sélectionné</span>
+                  <p className="app-heading font-semibold" aria-live="polite">{selectedTicketType ? `${Number(selectedTicketType.price).toLocaleString('fr-FR')} ${selectedTicketType.currency || 'Ar'}` : 'Sélectionnez un type de billet'}</p>
                 </div>
                 <div>
                   <label className="badge-field-label">Nombre de billets</label>
@@ -1083,8 +1081,8 @@ export default function TicketBadgeEditor() {
                   <div className="flex gap-2 flex-wrap mt-2">
                     {ticketTypes.length > 0 ? (
                       ticketTypes.map((tt) => (
-                        <label key={tt.id} className={`landing-chip cursor-pointer ${ticketType === tt.name ? 'landing-chip--active' : ''}`}>
-                          <input type="radio" name="ticket_type" value={tt.name} checked={ticketType === tt.name} onChange={() => setTicketType(tt.name)} className="sr-only" />
+                        <label key={tt.id} className={`landing-chip cursor-pointer ${ticketType === tt.id ? 'landing-chip--active' : ''}`}>
+                          <input type="radio" name="ticket_type" value={tt.id} checked={ticketType === tt.id} onChange={() => setTicketType(tt.id)} className="sr-only" />
                           {tt.name}
                         </label>
                       ))
@@ -1094,7 +1092,7 @@ export default function TicketBadgeEditor() {
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <button type="button" className="badge-editor-cta flex-1" onClick={handleGenerate}>Générer</button>
+                  <button type="button" className="badge-editor-cta flex-1" onClick={handleGenerate} disabled={!selectedTicketType}>Générer</button>
                   <button type="button" className="flex-1 py-2.5 rounded-xl border border-[var(--md-border)] app-text-muted font-semibold text-sm hover:bg-[var(--md-surface-muted)] transition-colors" onClick={() => setModalOpen(false)}>Annuler</button>
                 </div>
               </div>

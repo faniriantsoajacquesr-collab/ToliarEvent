@@ -18,6 +18,7 @@ const API_URL = (
 ).replace(/\/$/, '');
 
 const STATIC_PAGES = [
+  { path: '/organisateurs', changefreq: 'monthly', priority: '0.8' },
   { path: '/', changefreq: 'weekly', priority: '1.0' },
   { path: '/evenements', changefreq: 'daily', priority: '0.9' },
   { path: '/confidentialite', changefreq: 'yearly', priority: '0.3' },

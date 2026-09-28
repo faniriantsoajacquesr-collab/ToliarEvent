@@ -6,6 +6,13 @@ const EMAIL = 'faniriantsoajacquesr@gmail.com';
 
 const CONTACTS = [
   {
+    label: 'Facebook',
+    value: 'ToliarEvent',
+    href: 'https://www.facebook.com/search/top?q=ToliarEvent',
+    icon: 'public',
+    description: 'Retrouvez-nous sur Facebook',
+  },
+  {
     label: 'WhatsApp',
     value: PHONE_DISPLAY,
     href: `https://wa.me/${PHONE.replace('+', '')}`,
@@ -58,9 +65,9 @@ export default function ContactSection() {
               <RevealOnScroll key={contact.label} delay={i * 100} direction="right">
                 <a
                   href={contact.href}
-                  target={contact.label === 'WhatsApp' ? '_blank' : undefined}
-                  rel={contact.label === 'WhatsApp' ? 'noopener noreferrer' : undefined}
-                  className="landing-glass-card flex items-center gap-5 p-5 rounded-2xl group cursor-pointer"
+                  target={contact.href.startsWith('https:') ? '_blank' : undefined}
+                  rel={contact.href.startsWith('https:') ? 'noopener noreferrer' : undefined}
+                  className="landing-glass-card flex items-center gap-3 sm:gap-5 p-4 sm:p-5 rounded-2xl group cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
                 >
                   <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-all duration-300">
                     <span className="material-symbols-outlined text-[22px]" aria-hidden="true">
@@ -71,7 +78,7 @@ export default function ContactSection() {
                     <p className="text-[10px] font-bold uppercase tracking-[0.15em] landing-text-subtle mb-0.5">
                       {contact.label}
                     </p>
-                    <p className="font-semibold landing-heading group-hover:text-primary transition-colors truncate">
+                    <p className="font-semibold landing-heading group-hover:text-primary transition-colors break-words">
                       {contact.value}
                     </p>
                     <p className="text-sm landing-text-subtle mt-0.5">{contact.description}</p>

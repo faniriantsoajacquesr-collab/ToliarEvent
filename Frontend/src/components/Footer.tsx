@@ -20,9 +20,10 @@ export default function Footer() {
             <span className="font-landing-display text-lg font-bold landing-heading">ToliarEvent</span>
           </div>
           <p className="landing-text-subtle text-sm leading-relaxed max-w-xs">
-            Précision logistique au cœur de Toliara. La plateforme conçue par des organisateurs,
-            pour des organisateurs.
+            Découvrez les événements à Toliara et réservez vos billets.
+            Organisateurs, retrouvez vos outils pour préparer le jour J.
           </p>
+          <a href="mailto:faniriantsoajacquesr@gmail.com" className="landing-footer-link text-sm inline-block">Contactez-nous</a>
         </div>
 
         <div>
@@ -32,6 +33,7 @@ export default function Footer() {
           <ul className="space-y-3">
             <li><Link to="/" className="landing-footer-link text-sm">Accueil</Link></li>
             <li><Link to="/evenements" className="landing-footer-link text-sm">Événements</Link></li>
+            <li><Link to="/organisateurs" className="landing-footer-link text-sm">Organisateurs · ToliarEvent Pro</Link></li>
             <li><Link to="/#a-propos" className="landing-footer-link text-sm">Fonctionnalités</Link></li>
             <li><Link to="/#contact" className="landing-footer-link text-sm">Contact</Link></li>
           </ul>

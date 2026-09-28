@@ -12,7 +12,10 @@ module.exports = async function generateTickets({ admin, payload, frontendUrl = 
     }
   })();
 
-  const { event_id, count = 1, design_image_data, design_url, config, ticket_type = 'standard' } = payload;
+  const { event_id, count = 1, design_image_data, design_url, config } = payload;
+
+  const catalogType = await require('./resolveTicketType')(admin, payload);
+  const ticket_type = catalogType.name;
 
   // Phase 1: determine starting number per ticket_type
   let startNumber = 1;
@@ -37,7 +40,7 @@ module.exports = async function generateTickets({ admin, payload, frontendUrl = 
       id, 
       event_id, 
       ticket_type, 
-      price: payload.price || 0, // Insertion du prix depuis le payload
+      price: catalogType.price,
       number: startNumber + i, 
       created_at: new Date().toISOString() 
     });
@@ -101,7 +104,6 @@ module.exports = async function generateTickets({ admin, payload, frontendUrl = 
     }
   }
 
-  const { parseLayoutConfig, drawTicketOnPage } = require('./ticketPdfLayout');
 
   const A4_WIDTH_MM = 210;
   const A4_HEIGHT_MM = 297;

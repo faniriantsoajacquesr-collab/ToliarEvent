@@ -14,60 +14,7 @@ router.use(organizationAccessMiddleware);
  * POST /api/auth/signup
  * Crée un nouvel utilisateur et envoie un email de confirmation
  */
-router.post('/signup', async (req, res) => {
-  try {
-    const { email, password, metadata = {} } = req.body;
-
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email et mot de passe sont requis',
-      });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        error: 'Le mot de passe doit contenir au moins 8 caractères',
-      });
-    }
-
-    // Créer l'utilisateur avec confirmation par email
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${getFrontendUrl()}/auth/confirm-email`,
-        data: metadata,
-      },
-    });
-
-    if (error) {
-      console.error('Supabase signup error:', error); // Ajout de cette ligne pour un débogage plus détaillé
-      return res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-
-    return res.status(201).json({
-      success: true,
-      message: 'Compte créé avec succès. Vérifiez votre email pour confirmer votre compte.',
-      user: {
-        id: data.user?.id,
-        email: data.user?.email,
-        created_at: data.user?.created_at,
-      },
-    });
-  } catch (error) {
-    console.error('Erreur signup:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erreur lors de la création du compte',
-    });
-  }
-});
+router.post('/signup', require('../utils/registrationClosed'));
 
 /**
  * DELETE /api/auth/events/:id
@@ -2306,7 +2253,7 @@ router.post('/generate-tickets', async (req, res) => {
     const access_token = req.headers.authorization?.split('Bearer ')[1];
     if (!access_token) return res.status(401).json({ success: false, error: 'Token requis' }); // cite: 1
 
-    const { event_id, count = 1, design_image_data, design_url, config, ticket_type = 'standard' } = req.body;
+    const { event_id, count = 1, design_image_data, design_url, config } = req.body;
     if (!event_id || (!design_image_data && !design_url)) return res.status(400).json({ success: false, error: 'event_id et design_image_data ou design_url sont requis' });
 
     const { data: authData, error: authError } = await supabase.auth.getUser(access_token);
@@ -2325,6 +2272,15 @@ router.post('/generate-tickets', async (req, res) => {
 
     const admin = supabase.admin;
     if (!admin) return res.status(500).json({ success: false, error: 'Admin client non configuré' });
+
+    let catalogType;
+    try {
+      catalogType = await require('../services/resolveTicketType')(admin, req.body);
+    } catch (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+
+    const ticket_type = catalogType.name;
 
     // server-side libs (load safely and provide helpful error if missing)
     let QRCode;
@@ -2365,7 +2321,7 @@ router.post('/generate-tickets', async (req, res) => {
     const ticketsToInsert = [];
     for (let i = 0; i < Number(count); i++) {
       const id = randomUUID();
-      ticketsToInsert.push({ id, event_id, ticket_type, price: req.body.price || 0, number: startNumber + i, created_at: new Date().toISOString() });
+      ticketsToInsert.push({ id, event_id, ticket_type, price: catalogType.price, number: startNumber + i, created_at: new Date().toISOString() });
     }
 
     // Phase 2: insert into DB (admin client)

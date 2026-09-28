@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import LegalAcceptanceCheckbox from './LegalAcceptanceCheckbox';
 import PasswordInput from './PasswordInput';
+import EarlyAccessNotice from './EarlyAccessNotice';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -73,6 +74,20 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   if (!isOpen) return null;
 
+  if (!isLogin) return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-gutter" onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-labelledby="early-access-title" className="relative bg-surface w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl shadow-2xl p-xl">
+        <button type="button" autoFocus aria-label="Fermer" onClick={onClose} className="absolute top-3 right-3 min-h-11 min-w-11 text-on-surface"><span className="material-symbols-outlined" aria-hidden="true">close</span></button>
+        <h2 id="early-access-title" className="shrink-0 text-2xl font-semibold text-on-surface mb-6 pr-10">Demander un accès à ToliarEvent Pro</h2>
+        <div className="early-access-scroll min-h-0 overflow-y-auto pr-3">
+        <EarlyAccessNotice />
+        <button type="button" onClick={() => setIsLogin(true)} className="mt-6 min-h-11 text-primary underline">Vous avez déjà vos logins ? Se connecter</button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-gutter">
       <div
@@ -94,7 +109,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </span>
           </div>
           <h3 className="font-headline-md text-headline-md mb-xs">
-            {isLogin ? 'Se connecter' : 'Créer un compte'}
+            {isLogin ? 'Se connecter' : 'Demander un accès'}
           </h3>
           <p className="text-on-surface-variant text-sm">
             {isLogin
@@ -178,7 +193,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             className="w-full bg-primary text-on-primary py-md rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-sm"
           >
             {isLoading && <span className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />}
-            {isLogin ? 'Se connecter' : 'Créer un compte'}
+            {isLogin ? 'Se connecter' : 'Demander un accès'}
           </button>
         </form>
 
@@ -194,7 +209,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             }}
             className="text-primary underline hover:text-primary/80 font-medium transition-colors"
           >
-            {isLogin ? "S'inscrire" : 'Se connecter'}
+            {isLogin ? "Demander un accès" : 'Se connecter'}
           </button>
         </p>
       </div>

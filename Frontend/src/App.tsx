@@ -13,6 +13,7 @@ import OrganizationPendingPage from './pages/OrganizationPendingPage';
 
 // Main Pages
 import Home from './pages/Home';
+import OrganizersPage from './pages/OrganizersPage';
 import Dashboard from './pages/Dashboard';
 import TicketBadgeEditor from './pages/TicketBadgeEditor';
 import PublicationBuilder from './pages/PublicationBuilder';
@@ -95,6 +96,7 @@ function App() {
         <Routes>
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
+            <Route path="/organisateurs" element={<OrganizersPage />} />
             <Route path="/evenements" element={<EventListPage />} />
             <Route path="/evenements/:eventId" element={<EventLandingPage />} />
             <Route path="/a-propos" element={<Navigate to="/#a-propos" replace />} />

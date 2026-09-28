@@ -987,7 +987,7 @@ body {
   }
 
   .badge-editor-section__title svg {
-    color: var(--landing-primary);
+    color: var(--landing-primary, #1d4ed8);
     opacity: 0.85;
   }
 
@@ -1018,10 +1018,10 @@ body {
   }
 
   .badge-segment__btn--active {
-    border-color: var(--landing-primary);
-    background: color-mix(in srgb, var(--landing-primary) 10%, var(--md-surface));
-    color: var(--landing-primary);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--landing-primary) 25%, transparent);
+    border-color: var(--landing-primary, #1d4ed8);
+    background: color-mix(in srgb, var(--landing-primary, #1d4ed8) 10%, var(--md-surface));
+    color: var(--landing-primary, #1d4ed8);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--landing-primary, #1d4ed8) 25%, transparent);
   }
 
   .badge-segment__btn:disabled {
@@ -1047,9 +1047,9 @@ body {
   }
 
   .badge-mode-card--active {
-    border-color: var(--landing-primary);
-    background: color-mix(in srgb, var(--landing-primary) 8%, var(--md-surface));
-    color: var(--landing-primary);
+    border-color: var(--landing-primary, #1d4ed8);
+    background: color-mix(in srgb, var(--landing-primary, #1d4ed8) 8%, var(--md-surface));
+    color: var(--landing-primary, #1d4ed8);
   }
 
   .badge-mode-card--embedded.badge-mode-card--active {
@@ -1078,8 +1078,8 @@ body {
   }
 
   .badge-upload-zone:hover {
-    border-color: color-mix(in srgb, var(--landing-primary) 50%, var(--md-border));
-    background: color-mix(in srgb, var(--landing-primary) 4%, var(--md-surface-muted));
+    border-color: color-mix(in srgb, var(--landing-primary, #1d4ed8) 50%, var(--md-border));
+    background: color-mix(in srgb, var(--landing-primary, #1d4ed8) 4%, var(--md-surface-muted));
   }
 
   .badge-tip {
@@ -1087,8 +1087,8 @@ body {
     line-height: 1.45;
     padding: 0.625rem 0.75rem;
     border-radius: 0.625rem;
-    border: 1px solid color-mix(in srgb, var(--landing-primary) 20%, var(--md-border));
-    background: color-mix(in srgb, var(--landing-primary) 6%, var(--md-surface));
+    border: 1px solid color-mix(in srgb, var(--landing-primary, #1d4ed8) 20%, var(--md-border));
+    background: color-mix(in srgb, var(--landing-primary, #1d4ed8) 6%, var(--md-surface));
     color: var(--landing-text-muted);
   }
 
@@ -1115,8 +1115,8 @@ body {
   .badge-input:focus,
   .badge-select:focus {
     outline: none;
-    border-color: var(--landing-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--landing-primary) 15%, transparent);
+    border-color: var(--landing-primary, #1d4ed8);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--landing-primary, #1d4ed8) 15%, transparent);
   }
 
   .badge-input:disabled {
@@ -1142,7 +1142,7 @@ body {
 
   .badge-range-row input[type='range'] {
     flex: 1;
-    accent-color: var(--landing-primary);
+    accent-color: var(--landing-primary, #1d4ed8);
   }
 
   .badge-range-value {
@@ -1159,7 +1159,7 @@ body {
     flex-direction: column;
     min-height: 0;
     background:
-      radial-gradient(ellipse 90% 70% at 50% -10%, color-mix(in srgb, var(--landing-primary) 8%, transparent), transparent 55%),
+      radial-gradient(ellipse 90% 70% at 50% -10%, color-mix(in srgb, var(--landing-primary, #1d4ed8) 8%, transparent), transparent 55%),
       var(--md-surface-subtle);
   }
 
@@ -1247,15 +1247,17 @@ body {
     font-size: 0.875rem;
     font-weight: 700;
     color: #fff;
-    background: linear-gradient(135deg, var(--landing-primary) 0%, #2563eb 100%);
+    background: linear-gradient(135deg, var(--landing-primary, #1d4ed8) 0%, #2563eb 100%);
     border: none;
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--landing-primary) 35%, transparent);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--landing-primary, #1d4ed8) 35%, transparent);
     transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
   }
 
+
+
   .badge-editor-cta:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px color-mix(in srgb, var(--landing-primary) 40%, transparent);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--landing-primary, #1d4ed8) 40%, transparent);
   }
 
   .badge-editor-cta:disabled {
@@ -1347,3 +1349,13 @@ body {
     display: none;
   }
 }
+/* Keep the invitation dialog's scrollbar inside its rounded shell. */
+.early-access-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-border-strong) transparent;
+  overscroll-behavior-y: contain;
+}
+.early-access-scroll::-webkit-scrollbar { width: 5px; }
+.early-access-scroll::-webkit-scrollbar-track { background: transparent; }
+.early-access-scroll::-webkit-scrollbar-thumb { background: var(--md-border-strong); border-radius: 999px; }
+.early-access-scroll::-webkit-scrollbar-button { display: none; }

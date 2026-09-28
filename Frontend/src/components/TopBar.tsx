@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
@@ -208,8 +208,9 @@ export default function TopBar() {
 
           {!minimal && (
 
-            <div className="hidden md:flex items-center gap-8">
+            <div className="hidden lg:flex items-center gap-5 xl:gap-8">
 
+              <Link to="/organisateurs" onClick={() => { setPendingSection(null); closeMenu(); }} aria-current={pathname === '/organisateurs' ? 'page' : undefined} className={navClass(pathname === '/organisateurs', themed)}>Organisateurs</Link>
               {NAV_ITEMS.map((item) => (
 
                 <button
@@ -220,7 +221,7 @@ export default function TopBar() {
 
                   onClick={() => handleNavClick(item.id)}
 
-                  className={navClass(activeSection === item.id, themed)}
+                  className={navClass(pathname !== '/organisateurs' && activeSection === item.id, themed)}
 
                 >
 
@@ -238,7 +239,7 @@ export default function TopBar() {
 
           <div className="flex items-center gap-2">
 
-            {themed && <ThemeToggle className="hidden md:flex" />}
+            {themed && <ThemeToggle className="hidden lg:flex" />}
 
             {!auth && (
 
@@ -248,7 +249,7 @@ export default function TopBar() {
 
                   type="button"
 
-                  className={`hidden md:block px-4 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors ${
+                  className={`hidden lg:block px-4 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors ${
 
                     themed ? 'landing-nav-link' : 'text-on-surface-variant hover:text-primary'
 
@@ -276,11 +277,11 @@ export default function TopBar() {
 
                   }
 
-                  onClick={() => (pathname === '/signup' ? navigate('/signup') : setAuthModalOpen(true, 'signup'))}
+                  onClick={() => setAuthModalOpen(true, 'signup')}
 
                 >
 
-                  S&apos;inscrire
+                  Demander un accès
 
                 </button>
 
@@ -294,7 +295,7 @@ export default function TopBar() {
 
                 type="button"
 
-                className={`md:hidden p-2 cursor-pointer ${themed ? 'landing-nav-link' : 'text-on-surface'}`}
+                className={`lg:hidden p-2 cursor-pointer ${themed ? 'landing-nav-link' : 'text-on-surface'}`}
 
                 onClick={toggleMenu}
 
@@ -320,7 +321,7 @@ export default function TopBar() {
 
         <div
 
-          className={`fixed inset-0 z-[60] flex md:hidden flex-col items-center justify-center gap-8 px-gutter pt-20 backdrop-blur-xl ${
+          className={`fixed inset-0 z-[60] flex lg:hidden flex-col items-center justify-center gap-8 px-gutter pt-20 backdrop-blur-xl ${
 
             themed ? 'bg-[var(--landing-bg)]/95' : 'bg-surface'
 
@@ -346,7 +347,8 @@ export default function TopBar() {
 
           {themed && <ThemeToggle />}
 
-          {NAV_ITEMS.map((item) => (
+          <Link to="/organisateurs" onClick={() => { setPendingSection(null); closeMenu(); }} aria-current={pathname === '/organisateurs' ? 'page' : undefined} className={navClass(pathname === '/organisateurs', themed)}>Organisateurs</Link>
+              {NAV_ITEMS.map((item) => (
 
             <button
 
@@ -356,7 +358,7 @@ export default function TopBar() {
 
               onClick={() => handleNavClick(item.id)}
 
-              className={mobileNavClass(activeSection === item.id, themed)}
+              className={mobileNavClass(pathname !== '/organisateurs' && activeSection === item.id, themed)}
 
             >
 
@@ -404,7 +406,7 @@ export default function TopBar() {
 
             >
 
-              Créer un compte
+              Demander un accès
 
             </button>
 
@@ -423,4 +425,5 @@ export default function TopBar() {
   );
 
 }
+
 

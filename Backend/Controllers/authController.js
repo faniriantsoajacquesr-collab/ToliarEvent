@@ -6,57 +6,7 @@ const { getFrontendUrl } = require('../utils/helpers');
  */
 
 // Signup
-const signup = async (req, res) => {
-  try {
-    const { email, password, metadata = {} } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email et mot de passe sont requis',
-      });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        error: 'Le mot de passe doit contenir au moins 8 caractères',
-      });
-    }
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${getFrontendUrl()}/auth/confirm-email`,
-        data: metadata,
-      },
-    });
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-
-    return res.status(201).json({
-      success: true,
-      message: 'Compte créé avec succès. Vérifiez votre email pour confirmer votre compte.',
-      user: {
-        id: data.user?.id,
-        email: data.user?.email,
-        created_at: data.user?.created_at,
-      },
-    });
-  } catch (error) {
-    console.error('Erreur signup:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erreur lors de la création du compte',
-    });
-  }
-};
+const signup = require('../utils/registrationClosed');
 
 // Login
 const login = async (req, res) => {

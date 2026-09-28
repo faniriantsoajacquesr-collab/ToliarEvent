@@ -3,6 +3,7 @@ const APP_NAME = 'ToliarEvent';
 const ROUTE_TITLES: Record<string, string> = {
   '/': `Événements à Toliara | ${APP_NAME}`,
   '/evenements': `Événements | ${APP_NAME}`,
+  '/organisateurs': `Organisateurs — ToliarEvent Pro | ${APP_NAME}`,
   '/login': `Connexion | ${APP_NAME}`,
   '/signup': `Inscription | ${APP_NAME}`,
   '/complete-profile': `Compléter le profil | ${APP_NAME}`,
