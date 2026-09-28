@@ -94,21 +94,23 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl p-xl animate-in zoom-in-95 duration-200">
+      <div role="dialog" aria-modal="true" aria-labelledby="login-modal-title" className="relative bg-surface text-on-surface border border-outline-variant w-full max-w-md rounded-2xl shadow-2xl p-xl animate-in zoom-in-95 duration-200">
         <button
-          className="absolute top-md right-md text-on-surface-variant hover:text-on-surface"
+          type="button"
+          aria-label="Fermer"
+          className="absolute top-2 right-2 min-h-11 min-w-11 text-on-surface-variant hover:text-on-surface"
           onClick={onClose}
         >
           <span className="material-symbols-outlined">close</span>
         </button>
 
         <div className="text-center mb-xl">
-          <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-md">
+          <div className="w-16 h-16 bg-primary/10 text-primary dark:bg-blue-400/10 dark:text-blue-300 rounded-full flex items-center justify-center mx-auto mb-md">
             <span className="material-symbols-outlined text-[32px]">
               {isLogin ? 'lock' : 'person_add'}
             </span>
           </div>
-          <h3 className="font-headline-md text-headline-md mb-xs">
+          <h3 id="login-modal-title" className="font-headline-md text-headline-md text-on-surface mb-xs">
             {isLogin ? 'Se connecter' : 'Demander un accès'}
           </h3>
           <p className="text-on-surface-variant text-sm">
@@ -135,10 +137,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         <form onSubmit={handleSubmit} className="space-y-md">
           <div className="space-y-xs">
-            <label className="font-label-md text-label-md text-on-surface-variant ml-xs">
+            <label htmlFor="login-modal-email" className="font-label-md text-label-md text-on-surface-variant ml-xs">
               Email
             </label>
             <input
+              id="login-modal-email"
+              autoComplete="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -149,10 +153,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
 
           <div className="space-y-xs">
-            <label className="font-label-md text-label-md text-on-surface-variant ml-xs">
+            <label htmlFor="login-modal-password" className="font-label-md text-label-md text-on-surface-variant ml-xs">
               Mot de passe
             </label>
             <PasswordInput
+              id="login-modal-password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -207,7 +213,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               setPassword('');
               setConfirmPassword('');
             }}
-            className="text-primary underline hover:text-primary/80 font-medium transition-colors"
+            className="text-primary dark:text-blue-300 underline hover:text-primary/80 dark:hover:text-blue-200 font-medium transition-colors"
           >
             {isLogin ? "Demander un accès" : 'Se connecter'}
           </button>
