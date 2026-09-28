@@ -210,8 +210,9 @@ export default function TopBar() {
 
             <div className="hidden lg:flex items-center gap-5 xl:gap-8">
 
+              <button type="button" onClick={() => handleNavClick('accueil')} className={navClass(pathname !== '/organisateurs' && activeSection === 'accueil', themed)}>Accueil</button>
               <Link to="/organisateurs" onClick={() => { setPendingSection(null); closeMenu(); }} aria-current={pathname === '/organisateurs' ? 'page' : undefined} className={navClass(pathname === '/organisateurs', themed)}>Organisateurs</Link>
-              {NAV_ITEMS.map((item) => (
+              {NAV_ITEMS.filter((item) => item.id !== 'accueil').map((item) => (
 
                 <button
 
@@ -347,8 +348,9 @@ export default function TopBar() {
 
           {themed && <ThemeToggle />}
 
-          <Link to="/organisateurs" onClick={() => { setPendingSection(null); closeMenu(); }} aria-current={pathname === '/organisateurs' ? 'page' : undefined} className={navClass(pathname === '/organisateurs', themed)}>Organisateurs</Link>
-              {NAV_ITEMS.map((item) => (
+          <button type="button" onClick={() => handleNavClick('accueil')} className={mobileNavClass(pathname !== '/organisateurs' && activeSection === 'accueil', themed)}>Accueil</button>
+              <Link to="/organisateurs" onClick={() => { setPendingSection(null); closeMenu(); }} aria-current={pathname === '/organisateurs' ? 'page' : undefined} className={navClass(pathname === '/organisateurs', themed)}>Organisateurs</Link>
+              {NAV_ITEMS.filter((item) => item.id !== 'accueil').map((item) => (
 
             <button
 
