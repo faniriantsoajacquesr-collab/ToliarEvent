@@ -266,7 +266,7 @@ CREATE INDEX IF NOT EXISTS idx_ticket_designs_event ON public.ticket_designs(eve
 -- Table des types de billets (dépend de events)
 CREATE TABLE IF NOT EXISTS public.ticket_type (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  event_id uuid NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  event_id uuid NOT NULL,
   name text NOT NULL,
   price numeric NOT NULL DEFAULT 0,
   currency text NOT NULL DEFAULT 'Ar',
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS public.ticket_type (
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT ticket_type_pkey PRIMARY KEY (id),
-  CONSTRAINT ticket_type_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
+  CONSTRAINT ticket_type_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id) ON DELETE CASCADE
 );
 
 -- Migration pour bases existantes

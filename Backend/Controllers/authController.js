@@ -2,17 +2,20 @@ const supabase = require('../utils/supabase');
 const { getFrontendUrl } = require('../utils/helpers');
 
 /**
- * Contrôleur pour la gestion de l'authentification
+ * POST /api/auth/signup
+ * Inscription publique suspendue pendant l'accès anticipé.
  */
-
-// Signup
 const signup = require('../utils/registrationClosed');
 
-// Login
+/**
+ * POST /api/auth/login
+ * Connecte un utilisateur avec email et mot de passe
+ */
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -20,6 +23,7 @@ const login = async (req, res) => {
       });
     }
 
+    // Authentifier l'utilisateur
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -55,7 +59,10 @@ const login = async (req, res) => {
   }
 };
 
-// Logout
+/**
+ * POST /api/auth/logout
+ * Déconnecte l'utilisateur
+ */
 const logout = async (req, res) => {
   try {
     const { error } = await supabase.auth.signOut();
@@ -80,7 +87,10 @@ const logout = async (req, res) => {
   }
 };
 
-// Confirm Email
+/**
+ * POST /api/auth/confirm-email
+ * Confirme l'email de l'utilisateur avec un token
+ */
 const confirmEmail = async (req, res) => {
   try {
     const { token_hash, type } = req.body;
@@ -92,6 +102,7 @@ const confirmEmail = async (req, res) => {
       });
     }
 
+    // Vérifier le token
     const { data, error } = await supabase.auth.verifyOtp({
       token_hash,
       type,
@@ -126,7 +137,10 @@ const confirmEmail = async (req, res) => {
   }
 };
 
-// Refresh Token
+/**
+ * POST /api/auth/refresh-token
+ * Rafraîchit le token d'accès
+ */
 const refreshToken = async (req, res) => {
   try {
     const { refresh_token } = req.body;
@@ -166,7 +180,10 @@ const refreshToken = async (req, res) => {
   }
 };
 
-// Forgot Password
+/**
+ * POST /api/auth/forgot-password
+ * Envoie un email de réinitialisation du mot de passe
+ */
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -202,7 +219,10 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-// Reset Password
+/**
+ * POST /api/auth/reset-password
+ * Réinitialise le mot de passe avec un nouveau
+ */
 const resetPassword = async (req, res) => {
   try {
     const { new_password } = req.body;
@@ -222,6 +242,7 @@ const resetPassword = async (req, res) => {
       });
     }
 
+    // Mettre à jour le mot de passe
     const { data, error } = await supabase.auth.updateUser({
       password: new_password,
     });
@@ -250,7 +271,10 @@ const resetPassword = async (req, res) => {
   }
 };
 
-// Get User
+/**
+ * GET /api/auth/user
+ * Récupère les informations de l'utilisateur actuellement connecté
+ */
 const getUser = async (req, res) => {
   try {
     const access_token = req.headers.authorization?.split('Bearer ')[1];

@@ -1,0 +1,482 @@
+[
+  {
+    "method": "post",
+    "path": "/signup",
+    "domain": "auth",
+    "name": "signup"
+  },
+  {
+    "method": "delete",
+    "path": "/events/:id",
+    "domain": "events",
+    "name": "deleteEvent"
+  },
+  {
+    "method": "get",
+    "path": "/events",
+    "domain": "events",
+    "name": "listEvents"
+  },
+  {
+    "method": "get",
+    "path": "/event-categories",
+    "domain": "events",
+    "name": "listCategories"
+  },
+  {
+    "method": "get",
+    "path": "/events/landing-pages",
+    "domain": "publications",
+    "name": "listLandingPages"
+  },
+  {
+    "method": "get",
+    "path": "/events/public",
+    "domain": "publications",
+    "name": "listPublicEvents"
+  },
+  {
+    "method": "put",
+    "path": "/events/:id/landing-page/publish",
+    "domain": "publications",
+    "name": "publishLandingPage"
+  },
+  {
+    "method": "get",
+    "path": "/events/:id",
+    "domain": "events",
+    "name": "getEvent"
+  },
+  {
+    "method": "get",
+    "path": "/events/:id/landing-page",
+    "domain": "publications",
+    "name": "getLandingPage"
+  },
+  {
+    "method": "get",
+    "path": "/events/:id/public-landing-page",
+    "domain": "publications",
+    "name": "getPublicLandingPage"
+  },
+  {
+    "method": "post",
+    "path": "/events/:id/landing-page/upload-image",
+    "domain": "publications",
+    "name": "uploadImage"
+  },
+  {
+    "method": "put",
+    "path": "/events/:id/landing-page",
+    "domain": "publications",
+    "name": "saveLandingPage"
+  },
+  {
+    "method": "put",
+    "path": "/events/:id",
+    "domain": "events",
+    "name": "updateEvent"
+  },
+  {
+    "method": "post",
+    "path": "/generate-tickets-async",
+    "domain": "tickets",
+    "name": "generateTicketsAsync"
+  },
+  {
+    "method": "post",
+    "path": "/login",
+    "domain": "auth",
+    "name": "login"
+  },
+  {
+    "method": "post",
+    "path": "/logout",
+    "domain": "auth",
+    "name": "logout"
+  },
+  {
+    "method": "post",
+    "path": "/confirm-email",
+    "domain": "auth",
+    "name": "confirmEmail"
+  },
+  {
+    "method": "post",
+    "path": "/refresh-token",
+    "domain": "auth",
+    "name": "refreshToken"
+  },
+  {
+    "method": "get",
+    "path": "/organization-members",
+    "domain": "organizationMembers",
+    "name": "listMembers"
+  },
+  {
+    "method": "post",
+    "path": "/organization-members/bulk-action",
+    "domain": "organizationMembers",
+    "name": "bulkAction"
+  },
+  {
+    "method": "patch",
+    "path": "/organization-members/:id",
+    "domain": "organizationMembers",
+    "name": "updateMember"
+  },
+  {
+    "method": "delete",
+    "path": "/organization-members/:id",
+    "domain": "organizationMembers",
+    "name": "deleteMember"
+  },
+  {
+    "method": "post",
+    "path": "/forgot-password",
+    "domain": "auth",
+    "name": "forgotPassword"
+  },
+  {
+    "method": "post",
+    "path": "/reset-password",
+    "domain": "auth",
+    "name": "resetPassword"
+  },
+  {
+    "method": "get",
+    "path": "/user",
+    "domain": "auth",
+    "name": "getUser"
+  },
+  {
+    "method": "post",
+    "path": "/create-profile",
+    "domain": "profiles",
+    "name": "createProfile"
+  },
+  {
+    "method": "get",
+    "path": "/check-profile",
+    "domain": "profiles",
+    "name": "checkProfile"
+  },
+  {
+    "method": "get",
+    "path": "/skills",
+    "domain": "skills",
+    "name": "listSkills"
+  },
+  {
+    "method": "post",
+    "path": "/profile-skills",
+    "domain": "profiles",
+    "name": "setProfileSkills"
+  },
+  {
+    "method": "post",
+    "path": "/create-organization",
+    "domain": "organizations",
+    "name": "createOrganization"
+  },
+  {
+    "method": "post",
+    "path": "/join-organization",
+    "domain": "organizations",
+    "name": "joinOrganization"
+  },
+  {
+    "method": "post",
+    "path": "/organization-skills",
+    "domain": "organizations",
+    "name": "setOrganizationSkills"
+  },
+  {
+    "method": "post",
+    "path": "/create-event",
+    "domain": "events",
+    "name": "createEvent"
+  },
+  {
+    "method": "post",
+    "path": "/apply-event",
+    "domain": "eventStaff",
+    "name": "applyToEvent"
+  },
+  {
+    "method": "post",
+    "path": "/event-staff/bulk-action",
+    "domain": "eventStaff",
+    "name": "bulkAction"
+  },
+  {
+    "method": "post",
+    "path": "/event-staff/:id/validate",
+    "domain": "eventStaff",
+    "name": "validateStaff"
+  },
+  {
+    "method": "delete",
+    "path": "/event-staff/:id",
+    "domain": "eventStaff",
+    "name": "deleteStaff"
+  },
+  {
+    "method": "post",
+    "path": "/event-staff/my/:id/retry",
+    "domain": "eventStaff",
+    "name": "retryApplication"
+  },
+  {
+    "method": "delete",
+    "path": "/event-staff/my/:id",
+    "domain": "eventStaff",
+    "name": "deleteMyApplication"
+  },
+  {
+    "method": "get",
+    "path": "/event-staff",
+    "domain": "eventStaff",
+    "name": "listStaff"
+  },
+  {
+    "method": "get",
+    "path": "/my-organization",
+    "domain": "organizations",
+    "name": "getMyOrganization"
+  },
+  {
+    "method": "post",
+    "path": "/generate-tickets",
+    "domain": "tickets",
+    "name": "generateTickets"
+  },
+  {
+    "method": "get",
+    "path": "/my-event-application",
+    "domain": "eventStaff",
+    "name": "getMyEventApplication"
+  },
+  {
+    "method": "get",
+    "path": "/my-applications",
+    "domain": "eventStaff",
+    "name": "listMyApplications"
+  },
+  {
+    "method": "get",
+    "path": "/tickets",
+    "domain": "tickets",
+    "name": "listTickets"
+  },
+  {
+    "method": "post",
+    "path": "/tickets/bulk-delete",
+    "domain": "tickets",
+    "name": "bulkDelete"
+  },
+  {
+    "method": "post",
+    "path": "/tickets/restore-printed",
+    "domain": "tickets",
+    "name": "restorePrinted"
+  },
+  {
+    "method": "post",
+    "path": "/tickets/bulk-update-status",
+    "domain": "tickets",
+    "name": "bulkUpdateStatus"
+  },
+  {
+    "method": "post",
+    "path": "/tickets/scan",
+    "domain": "tickets",
+    "name": "scanTicket"
+  },
+  {
+    "method": "get",
+    "path": "/tickets/:id",
+    "domain": "tickets",
+    "name": "getTicket"
+  },
+  {
+    "method": "delete",
+    "path": "/tickets/:id",
+    "domain": "tickets",
+    "name": "deleteTicket"
+  },
+  {
+    "method": "put",
+    "path": "/tickets/:id",
+    "domain": "tickets",
+    "name": "updateTicket"
+  },
+  {
+    "method": "get",
+    "path": "/ticket-type",
+    "domain": "ticketTypes",
+    "name": "listTypes"
+  },
+  {
+    "method": "post",
+    "path": "/ticket-type",
+    "domain": "ticketTypes",
+    "name": "createType"
+  },
+  {
+    "method": "put",
+    "path": "/ticket-type/:id",
+    "domain": "ticketTypes",
+    "name": "updateType"
+  },
+  {
+    "method": "delete",
+    "path": "/ticket-type/:id",
+    "domain": "ticketTypes",
+    "name": "deleteType"
+  },
+  {
+    "method": "get",
+    "path": "/transactions-categories",
+    "domain": "finances",
+    "name": "listCategories"
+  },
+  {
+    "method": "post",
+    "path": "/transactions-categories",
+    "domain": "finances",
+    "name": "createCategory"
+  },
+  {
+    "method": "get",
+    "path": "/transactions",
+    "domain": "finances",
+    "name": "listTransactions"
+  },
+  {
+    "method": "post",
+    "path": "/transactions",
+    "domain": "finances",
+    "name": "createTransaction"
+  },
+  {
+    "method": "put",
+    "path": "/transactions/:id",
+    "domain": "finances",
+    "name": "updateTransaction"
+  },
+  {
+    "method": "delete",
+    "path": "/transactions/:id",
+    "domain": "finances",
+    "name": "deleteTransaction"
+  },
+  {
+    "method": "get",
+    "path": "/whoami",
+    "domain": "diagnostics",
+    "name": "whoami"
+  },
+  {
+    "method": "get",
+    "path": "/debug/tickets",
+    "domain": "diagnostics",
+    "name": "inspectTickets"
+  },
+  {
+    "method": "get",
+    "path": "/tasks",
+    "domain": "tasks",
+    "name": "listTasks"
+  },
+  {
+    "method": "post",
+    "path": "/tasks",
+    "domain": "tasks",
+    "name": "createTask"
+  },
+  {
+    "method": "put",
+    "path": "/tasks/:id",
+    "domain": "tasks",
+    "name": "updateTask"
+  },
+  {
+    "method": "delete",
+    "path": "/tasks/:id",
+    "domain": "tasks",
+    "name": "deleteTask"
+  },
+  {
+    "method": "put",
+    "path": "/events/:id/ticket-types-active",
+    "domain": "ticketTypes",
+    "name": "setActiveTypes"
+  },
+  {
+    "method": "get",
+    "path": "/payment-methods",
+    "domain": "orders",
+    "name": "listPaymentMethods"
+  },
+  {
+    "method": "post",
+    "path": "/events/:id/purchase-ticket",
+    "domain": "orders",
+    "name": "purchaseTicket"
+  },
+  {
+    "method": "get",
+    "path": "/admin/organizations/pending",
+    "domain": "administration",
+    "name": "listPendingOrganizations"
+  },
+  {
+    "method": "patch",
+    "path": "/admin/organizations/:id/status",
+    "domain": "administration",
+    "name": "updateOrganizationStatus"
+  },
+  {
+    "method": "get",
+    "path": "/events/:eventId/orders",
+    "domain": "orders",
+    "name": "listEventOrders"
+  },
+  {
+    "method": "post",
+    "path": "/orders/bulk-devalidate",
+    "domain": "orders",
+    "name": "bulkDevalidate"
+  },
+  {
+    "method": "post",
+    "path": "/orders/bulk-validate",
+    "domain": "orders",
+    "name": "bulkValidate"
+  },
+  {
+    "method": "post",
+    "path": "/orders/bulk-delete",
+    "domain": "orders",
+    "name": "bulkDelete"
+  },
+  {
+    "method": "post",
+    "path": "/orders/:id/validate",
+    "domain": "orders",
+    "name": "validateOrder"
+  },
+  {
+    "method": "post",
+    "path": "/orders/:id/devalidate",
+    "domain": "orders",
+    "name": "devalidateOrder"
+  },
+  {
+    "method": "delete",
+    "path": "/orders/:id",
+    "domain": "orders",
+    "name": "deleteOrder"
+  }
+]

@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import TopBar from './TopBar';
 
 import Footer from './Footer';
+import RecentCheckoutLink from './RecentCheckoutLink';
 
 import { isMarketingPage, isPublicShellPage } from '../utils/publicPages';
 
@@ -37,6 +38,7 @@ export default function PublicLayout() {
         <div className="flex-1">
 
           <Outlet />
+          <RecentCheckoutLink />
 
         </div>
 

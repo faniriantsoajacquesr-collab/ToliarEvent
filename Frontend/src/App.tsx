@@ -13,6 +13,7 @@ import OrganizationPendingPage from './pages/OrganizationPendingPage';
 
 // Main Pages
 import Home from './pages/Home';
+import PaymentStatusPage from './pages/PaymentStatusPage';
 import OrganizersPage from './pages/OrganizersPage';
 import Dashboard from './pages/Dashboard';
 import TicketBadgeEditor from './pages/TicketBadgeEditor';
@@ -99,6 +100,7 @@ function App() {
             <Route path="/organisateurs" element={<OrganizersPage />} />
             <Route path="/evenements" element={<EventListPage />} />
             <Route path="/evenements/:eventId" element={<EventLandingPage />} />
+            <Route path="/paiement/:id" element={<PaymentStatusPage />} />
             <Route path="/a-propos" element={<Navigate to="/#a-propos" replace />} />
             <Route path="/contact" element={<Navigate to="/#contact" replace />} />
             <Route path="/login" element={<LoginPage />} />

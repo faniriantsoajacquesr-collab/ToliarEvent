@@ -135,9 +135,10 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
           <p className="mt-md">
-            Les paiements Mobile Money sont initiés par vous auprès de votre opérateur ; nous
-            recevons uniquement la référence de transaction que vous communiquez pour vérification
-            manuelle par l&apos;organisateur.
+            Les paiements sont traités par Papi. Nous lui transmettons le montant, la référence
+            de commande, votre nom, votre téléphone et votre email si vous le renseignez.
+            Nous recevons le statut et les références du paiement pour délivrer vos billets.
+            Les données de carte bancaire sont saisies sur Papi et ne transitent pas par notre serveur.
           </p>
         </section>
 

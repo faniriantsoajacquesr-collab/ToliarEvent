@@ -24,6 +24,7 @@ interface OnlineOrder {
   transaction_id: string;
   total_amount: number;
   payment_status: PaymentStatus;
+  payment_provider?: string;
   created_at: string;
   ticket_count: number;
   tickets: OrderTicket[];
@@ -138,7 +139,8 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
     loadOrders();
   }, [loadOrders]);
 
-  const allSelected = orders.length > 0 && orders.every((order) => selectedOrderIds.has(order.id));
+  const selectableOrders = orders.filter(order => order.payment_provider !== 'papi');
+  const allSelected = selectableOrders.length > 0 && selectableOrders.every((order) => selectedOrderIds.has(order.id));
   const someSelected = orders.some((order) => selectedOrderIds.has(order.id));
   const selectedPendingCount = Array.from(selectedOrderIds).filter((id) => {
     const order = orders.find((o) => o.id === id);
@@ -153,7 +155,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
     if (allSelected) {
       setSelectedOrderIds(new Set());
     } else {
-      setSelectedOrderIds(new Set(orders.map((order) => order.id)));
+      setSelectedOrderIds(new Set(orders.filter(order => order.payment_provider !== 'papi').map((order) => order.id)));
     }
   };
 
@@ -361,7 +363,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
       <div className="relative z-10 max-w-container-max mx-auto px-gutter pb-12 pt-24 md:pt-28 space-y-8">
         <AppPageHeader
           title="Commandes en ligne"
-          subtitle="Suivez les achats Mobile Money et validez les paiements pour activer la vente des billets."
+          subtitle="Suivez les achats confirmés par Papi et gérez les anciennes commandes à validation manuelle."
         />
 
         <section>
@@ -534,6 +536,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                           <input
                             type="checkbox"
                             checked={selectedOrderIds.has(order.id)}
+                            disabled={order.payment_provider === 'papi'}
                             onChange={() => toggleSelectOne(order.id)}
                             className="h-4 w-4 rounded border-[var(--md-border)] text-primary focus:ring-primary/30 cursor-pointer accent-[var(--landing-primary)]"
                             aria-label={`Sélectionner commande ${order.transaction_id}`}
@@ -549,6 +552,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                         </td>
                         <td className="px-5 py-4">
                           <div className="font-mono text-xs app-heading">{order.transaction_id}</div>
+                          {order.payment_provider === 'papi' && <div className="mt-1 text-xs text-emerald-600">Papi · confirmation automatique</div>}
                           {order.payment_method && (
                             <div className="text-xs app-text-muted mt-1">{order.payment_method.Operateur}</div>
                           )}
@@ -591,7 +595,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                                 )}
                               </button>
                             )}
-                            {order.payment_status === 'validated' && (
+                            {order.payment_status === 'validated' && order.payment_provider !== 'papi' && (
                               <button
                                 type="button"
                                 title="Dévalider"
@@ -610,7 +614,7 @@ export default function OrderManagement({ selectedEventId }: { selectedEventId: 
                               type="button"
                               title="Supprimer"
                               onClick={() => handleDelete(order)}
-                              disabled={deletingId === order.id || validatingId === order.id || devalidatingId === order.id || isBulkProcessing}
+                              disabled={order.payment_provider === 'papi' || deletingId === order.id || validatingId === order.id || devalidatingId === order.id || isBulkProcessing}
                               className="dash-action-btn dash-action-btn--danger disabled:opacity-50"
                             >
                               {deletingId === order.id ? (

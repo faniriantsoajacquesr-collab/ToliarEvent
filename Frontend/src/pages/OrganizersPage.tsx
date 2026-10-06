@@ -16,8 +16,7 @@ const modules = [
 ];
 const questions = [
   ['À qui s’adresse ToliarEvent Pro ?', 'Aux organisateurs de concerts, événements culturels, rencontres gaming, ateliers et autres rendez-vous à Toliara. Votre organisation regroupe ses événements et son équipe dans un espace commun.'],
-  ['Comment commencer ?', 'Créez votre compte, confirmez votre adresse e-mail et complétez votre profil. Créez ensuite votre organisation ou rejoignez-en une avec son code. Une nouvelle organisation peut nécessiter une validation avant son activation.'],
-  ['Comment fonctionnent les paiements Mobile Money ?', 'L’acheteur effectue son paiement auprès du moyen indiqué, puis renseigne sa référence de transaction. Votre administration vérifie le paiement et valide la commande. La confirmation auprès de l’opérateur n’est pas automatique.'],
+  ['Comment commencer ?', 'L’accès à ToliarEvent Pro se fait actuellement sur invitation. Cliquez sur « Demander un accès » pour retrouver nos coordonnées, puis contactez-nous par e-mail, Facebook, téléphone ou WhatsApp pour discuter de votre projet. Si votre demande est retenue, nous créons votre compte et vous transmettons vos identifiants pour vous accompagner dans vos premiers pas. Pendant la phase d’accès anticipé, l’accès est gratuit pour les étudiants et jeunes organisateurs sélectionnés.'],
   ['Puis-je imprimer les billets ?', 'Oui. Vous pouvez personnaliser les billets et générer des PDF avec QR code, puis utiliser les outils de scan pour leur activation et le contrôle d’entrée.'],
   ['Faut-il une connexion Internet ?', 'Oui. La gestion des événements, des commandes et le contrôle des billets utilisent le serveur. Prévoyez une connexion sur le lieu de l’événement.'],
 ];

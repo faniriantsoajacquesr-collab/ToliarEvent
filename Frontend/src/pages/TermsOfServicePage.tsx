@@ -100,9 +100,9 @@ export default function TermsOfServicePage() {
               L&apos;achat de billets via les pages publiques ne nécessite pas de compte utilisateur.
             </li>
             <li>
-              Le paiement s&apos;effectue via Mobile Money auprès de l&apos;opérateur indiqué ;
-              la validation du billet dépend de la vérification manuelle de la transaction par
-              l&apos;organisateur.
+              Le paiement s&apos;effectue sur la page sécurisée Papi, par Mobile Money ou carte
+              selon les moyens disponibles. Les billets sont délivrés après confirmation du
+              paiement par notre serveur et sont accessibles depuis le lien de suivi de commande.
             </li>
             <li>
               Les litiges relatifs aux remboursements, annulations ou erreurs de paiement relèvent
