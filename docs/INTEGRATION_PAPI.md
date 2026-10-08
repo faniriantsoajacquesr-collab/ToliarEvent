@@ -34,6 +34,22 @@ Le code est intégré ; la migration distante et les paramètres ci-dessous rest
 
 ## Recette
 
+### Erreur « Les URL de paiement doivent utiliser HTTPS »
+
+Sur Render, configurer les origines publiques (valeurs actuelles référencées dans le projet) :
+
+```dotenv
+FRONTEND_URL=https://toliarevent.vercel.app
+BACKEND_PUBLIC_URL=https://toliarevent.onrender.com
+PAPI_BASE_URL=https://app.papi.mg/engine/api
+```
+
+Puis redéployer le backend. Ne pas copier `FRONTEND_URL=http://localhost:5173` dans l’environnement de production. La validation indique désormais le nom de la variable incorrecte sans afficher de secret.
+
+Pour un backend local, `FRONTEND_URL=http://localhost:5173` est autorisé hors `NODE_ENV=production`. `BACKEND_PUBLIC_URL` doit toujours être une URL HTTPS joignable par Papi : un tunnel vers ce backend local. L’adresse Render reçoit les notifications sur Render, même si le formulaire est ouvert en local.
+
+### Scénarios de validation
+
 - Acheter un puis plusieurs billets : vérifier montant, opérateurs disponibles et retour au suivi.
 - Confirmer le paiement : vérifier une commande validée, le bon nombre de billets, leurs QR codes et leur scan par le staff autorisé.
 - Refuser/abandonner le paiement, puis réessayer sur le lien actif.

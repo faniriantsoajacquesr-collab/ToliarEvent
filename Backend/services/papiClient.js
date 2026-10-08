@@ -21,10 +21,19 @@ function config() {
   if (!process.env.PAPI_API_KEY || !process.env.PAPI_WEBHOOK_SECRET || !frontend || !backend) {
     throw Object.assign(new Error('Le paiement en ligne n’est pas encore configuré.'), { status: 503 });
   }
-  for (const value of [base, frontend, backend]) {
-    const url = new URL(value);
-    if (url.protocol !== 'https:' && !(process.env.NODE_ENV !== 'production' && url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) {
-      throw Object.assign(new Error('Les URL de paiement doivent utiliser HTTPS.'), { status: 503 });
+  for (const [name, value] of [['PAPI_BASE_URL', base], ['FRONTEND_URL', frontend], ['BACKEND_PUBLIC_URL', backend]]) {
+    let url;
+    try { url = new URL(value); }
+    catch { throw Object.assign(new Error(`${name} doit être une URL valide.`), { status: 503 }); }
+    const localFrontend = name === 'FRONTEND_URL' && process.env.NODE_ENV !== 'production' &&
+      url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if (url.protocol !== 'https:' && !localFrontend) {
+      const hint = name === 'FRONTEND_URL'
+        ? 'En production, utilisez l’adresse HTTPS du site déployé.'
+        : name === 'BACKEND_PUBLIC_URL'
+          ? 'Utilisez l’adresse Render ou un tunnel HTTPS vers votre backend local.'
+          : 'Utilisez https://app.papi.mg/engine/api.';
+      throw Object.assign(new Error(`${name} doit utiliser HTTPS. ${hint}`), { status: 503 });
     }
   }
   return { base, frontend, backend };

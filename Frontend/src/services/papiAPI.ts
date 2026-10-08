@@ -20,6 +20,11 @@ async function request(path: string, token: string, body?: unknown): Promise<Res
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(40000),
   });
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error(response.status === 404
+      ? 'Le serveur ne dispose pas encore des routes de paiement Papi. Déployez la nouvelle version du backend ou utilisez le backend local.'
+      : `Le serveur de paiement a renvoyé une réponse inattendue (HTTP ${response.status}). Réessayez dans quelques instants.`);
+  }
   const data = await response.json();
   if (!response.ok || !data.success) throw new Error(data.error || 'Impossible de joindre le service de paiement.');
   return data;
