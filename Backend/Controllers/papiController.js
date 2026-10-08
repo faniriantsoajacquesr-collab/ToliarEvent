@@ -1,6 +1,7 @@
 const supabase = require('../utils/supabase');
 const papi = require('../services/papiClient');
 const { createCheckoutService } = require('../services/papiCheckout');
+const { checkoutError } = require('../services/papiErrors');
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function service() {
   if (!supabase.admin) throw Object.assign(new Error('Le paiement en ligne est indisponible.'), { status: 503 });
@@ -45,9 +46,8 @@ exports.create = handler(async (req, res) => {
     p_buyer_name: b.buyer_name.trim(), p_buyer_phone: b.buyer_phone.trim(), p_buyer_email: b.buyer_email?.trim() || null,
   });
   if (error) {
-    const message = error.message || '';
-    const known = /CHECKOUT_CONFLICT|TICKET_UNAVAILABLE|EVENT_UNAVAILABLE|INVALID_AMOUNT/.test(message);
-    return res.status(known ? 409 : 503).json({ success: false, error: known ? 'Commande incompatible ou billets indisponibles. Le total minimum est de 300 Ar.' : 'Le paiement en ligne n’est pas encore disponible.' });
+    const failure = checkoutError(error);
+    return res.status(failure.status).json({ success: false, code: failure.code, error: failure.message });
   }
   // Creation and redirection are separate: the browser keeps a recovery URL even if Papi times out.
   res.status(201).json({ success: true, checkout: await svc.publicView(Array.isArray(data) ? data[0] : data) });
