@@ -34,8 +34,6 @@ exports.create = handler(async (req, res) => {
       !Number.isSafeInteger(Number(b.ticket_type_id)) || Number(b.ticket_type_id) < 1 ||
       !Number.isInteger(b.quantity) || b.quantity < 1 || b.quantity > 20 ||
       typeof b.buyer_name !== 'string' || !b.buyer_name.trim() || b.buyer_name.length > 150 ||
-      typeof b.buyer_phone !== 'string' || !/^[+\d () .-]{9,25}$/.test(b.buyer_phone) ||
-      !/^\d{9,15}$/.test(b.buyer_phone.replace(/\D/g, '')) ||
       (b.buyer_email && (typeof b.buyer_email !== 'string' || b.buyer_email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.buyer_email))) || b.accepted_terms !== true) {
     return res.status(400).json({ success: false, error: 'Vérifiez vos coordonnées, la quantité et l’acceptation des conditions.' });
   }
@@ -43,7 +41,7 @@ exports.create = handler(async (req, res) => {
   const { data, error } = await supabase.admin.rpc('create_papi_checkout', {
     p_id: b.checkout_id, p_access_hash: papi.hashToken(secret), p_event_id: req.params.id,
     p_ticket_type_id: Number(b.ticket_type_id), p_quantity: b.quantity,
-    p_buyer_name: b.buyer_name.trim(), p_buyer_phone: b.buyer_phone.trim(), p_buyer_email: b.buyer_email?.trim() || null,
+    p_buyer_name: b.buyer_name.trim(), p_buyer_phone: null, p_buyer_email: b.buyer_email?.trim() || null,
   });
   if (error) {
     const failure = checkoutError(error);

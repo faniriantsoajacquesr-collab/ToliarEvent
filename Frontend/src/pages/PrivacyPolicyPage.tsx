@@ -136,7 +136,8 @@ export default function PrivacyPolicyPage() {
           </ul>
           <p className="mt-md">
             Les paiements sont traités par Papi. Nous lui transmettons le montant, la référence
-            de commande, votre nom, votre téléphone et votre email si vous le renseignez.
+            de commande, votre nom et votre email si vous le renseignez.
+            Le numéro nécessaire au paiement Mobile Money est saisi directement sur Papi.
             Nous recevons le statut et les références du paiement pour délivrer vos billets.
             Les données de carte bancaire sont saisies sur Papi et ne transitent pas par notre serveur.
           </p>

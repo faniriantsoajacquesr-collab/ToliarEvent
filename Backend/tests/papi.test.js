@@ -42,13 +42,16 @@ async function database(t) {
   const migration = readFileSync(resolve(__dirname, '../../migrations/20261006_papi_checkout.sql'), 'utf8');
   await pg.exec(migration);
   await pg.exec(migration); // safe reapplication
+  const optionalPhone = readFileSync(resolve(__dirname, '../../migrations/20261008_papi_optional_phone.sql'), 'utf8');
+  await pg.exec(optionalPhone);
+  await pg.exec(optionalPhone);
   const eventId = randomUUID();
   await pg.query("INSERT INTO events(id,title,location,start_date,end_date) VALUES($1,'Concert','Toliara',now(),now()+interval '1 day')", [eventId]);
   const { rows } = await pg.query("INSERT INTO ticket_type(event_id,name,price) VALUES($1,'Standard',1500) RETURNING id", [eventId]);
   return { pg, eventId, typeId: rows[0].id };
 }
 async function create(pg, eventId, typeId, id = randomUUID(), count = 2, hash = 'hash') {
-  const { rows } = await pg.query('SELECT * FROM create_papi_checkout($1,$2,$3,$4,$5,$6,$7,$8)', [id, hash, eventId, typeId, count, 'Client', '0340000000', null]);
+  const { rows } = await pg.query('SELECT * FROM create_papi_checkout($1,$2,$3,$4,$5,$6,$7,$8)', [id, hash, eventId, typeId, count, 'Client', null, null]);
   return rows[0];
 }
 
@@ -56,6 +59,7 @@ test('SQL checkout lifecycle: server price, no early tickets, atomic/idempotent 
   const { pg, eventId, typeId } = await database(t);
   const c = await create(pg, eventId, typeId);
   assert.equal(Number(c.amount), 3000);
+  assert.equal(c.buyer_phone, null);
   assert.equal((await pg.query('SELECT * FROM tickets')).rows.length, 0);
   assert.equal((await create(pg, eventId, typeId, c.id)).id, c.id);
   await assert.rejects(create(pg, eventId, typeId, c.id, 2, 'wrong'), /CHECKOUT_CONFLICT/);
@@ -68,6 +72,7 @@ test('SQL checkout lifecycle: server price, no early tickets, atomic/idempotent 
   assert.deepEqual(tickets.map(ticket => ticket.status), ['vendu', 'vendu']);
   assert.deepEqual(tickets.map(ticket => ticket.number), [1, 2]);
   assert.equal((await pg.query('SELECT * FROM orders')).rows.length, 1);
+  assert.equal((await pg.query('SELECT buyer_phone FROM orders')).rows[0].buyer_phone, null);
   assert.equal((await pg.query('SELECT * FROM order_items')).rows.length, 2);
   await assert.rejects(pg.query("UPDATE orders SET payment_status='pending' WHERE id=$1", [c.id]), /manuellement/);
   await assert.rejects(pg.query('DELETE FROM orders WHERE id=$1', [c.id]), /supprimée/);
@@ -164,6 +169,7 @@ test('new payment link uses the persisted total and server callback; provider ti
     assert.equal(body.successUrl, `https://tickets.example/paiement/${c.id}#token=secret`);
     assert.equal(body.failureUrl, body.successUrl);
     assert.equal(body.provider, undefined);
+    assert.equal(Object.hasOwn(body, 'payerPhone'), false);
     if (shouldTimeout) throw new Error('timeout');
     return { paymentReference: `PAPI-${c.id}`, amount: 3000, notificationToken: 'provider-token', paymentLink: 'https://payment-form.papi.mg/shop/payments/new', linkExpirationDateTime: Date.now() + 3600000 };
   };

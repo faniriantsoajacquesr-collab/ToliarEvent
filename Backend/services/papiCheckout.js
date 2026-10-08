@@ -75,7 +75,7 @@ function createCheckoutService(db) {
       const returnUrl = `${frontend}/paiement/${checkout.id}#token=${accessToken}`;
       const data = await papi.request('/payment-links', {
         reference: `PAPI-${checkout.id}`, amount: Number(checkout.amount), currency: 'MGA',
-        clientName: checkout.buyer_name, payerPhone: checkout.buyer_phone,
+        clientName: checkout.buyer_name,
         ...(checkout.buyer_email ? { payerEmail: checkout.buyer_email } : {}),
         description: `${checkout.quantity} × ${checkout.ticket_type_name} — ${checkout.event_title}`.slice(0, 255),
         successUrl: returnUrl, failureUrl: returnUrl,

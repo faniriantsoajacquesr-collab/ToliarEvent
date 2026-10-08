@@ -2,7 +2,7 @@
 
 ## Étapes appliquées au code
 
-1. **Commande avant paiement** : formulaire sans compte (catégorie, quantité, nom, téléphone, email facultatif). Le serveur lit le prix du catalogue ; aucun montant fourni par le navigateur ne fait foi. Une commande en préparation est conservée dans `papi_checkouts`, sans billet utilisable.
+1. **Commande avant paiement** : formulaire sans compte (catégorie, quantité, nom, email facultatif). Le téléphone est demandé directement par Papi si le moyen de paiement le nécessite. Le serveur lit le prix du catalogue ; aucun montant fourni par le navigateur ne fait foi. Une commande en préparation est conservée dans `papi_checkouts`, sans billet utilisable.
 2. **Page de suivi** : URL personnelle `/paiement/:id#token=…`, conservée avant la redirection. Le jeton aléatoire de 256 bits reste dans le fragment d’URL ; seul son SHA-256 est stocké en base. Les appels utilisent `X-Checkout-Token`. Le site propose un raccourci vers la dernière commande sur le même appareil.
 3. **Redirection Papi** : création serveur d’un lien valable une heure, sans opérateur imposé, puis ouverture dans le même onglet. MVola, Airtel Money, Orange Money et carte sont proposés selon la configuration Papi. La référence est `PAPI-<uuid commande>`.
 4. **Confirmation serveur** : réception du corps brut, vérification HMAC SHA-256 et tolérance temporelle de cinq minutes, puis comparaison de la référence, du jeton de notification et du montant. Le retour du navigateur ne valide jamais une commande.
@@ -13,6 +13,8 @@
 ## Activation sur l’environnement cible
 
 Le code est intégré ; la migration distante et les paramètres ci-dessous restent à appliquer avant ouverture des ventes.
+
+**Mise à jour du 8 octobre — téléphone supprimé du formulaire :** après la migration initiale, exécuter `migrations/20261008_papi_optional_phone.sql` avant de déployer le nouveau backend. Elle autorise les commandes sans téléphone et conserve les numéros des anciennes commandes. La signature RPC reste compatible.
 
 1. Dans le SQL Editor du projet Supabase utilisé par le backend, exécuter **`migrations/20261006_papi_checkout.sql`** avec le rôle propriétaire. La migration est transactionnelle et réexécutable. Elle doit suivre le schéma existant `db.sql`, pas le remplacer. Elle ajoute les fonctions, les protections d’accès et passe les numéros de billets en `integer`.
 2. Dans **`Backend/.env`**, compléter :

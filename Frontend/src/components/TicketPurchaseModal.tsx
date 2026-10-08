@@ -13,7 +13,6 @@ export default function TicketPurchaseModal({ isOpen, onClose, eventId, ticketTy
   const navigate = useNavigate();
   const [quantity, setQuantity] = useState('1');
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -31,7 +30,7 @@ export default function TicketPurchaseModal({ isOpen, onClose, eventId, ticketTy
     setError('');
     setLegalError('');
     if (!accepted) { setLegalError('Acceptez les conditions pour continuer.'); return; }
-    const body = { ticket_type_id: ticketType.id, quantity: Number(quantity), buyer_name: name.trim(), buyer_phone: phone.trim(), buyer_email: email.trim(), accepted_terms: true };
+    const body = { ticket_type_id: ticketType.id, quantity: Number(quantity), buyer_name: name.trim(), buyer_email: email.trim(), accepted_terms: true };
     const fingerprint = JSON.stringify({ eventId, ...body });
     // Persist before the first request: a lost response must reuse the same order.
     try {
@@ -73,7 +72,6 @@ export default function TicketPurchaseModal({ isOpen, onClose, eventId, ticketTy
           </label>
         </div>
         <label className="block text-sm font-medium">Nom complet *<input autoFocus autoComplete="name" required maxLength={150} value={name} disabled={busy} onChange={e => setName(e.target.value)} className={input} /></label>
-        <label className="block text-sm font-medium">Téléphone *<input type="tel" autoComplete="tel" required minLength={9} maxLength={25} value={phone} disabled={busy} onChange={e => setPhone(e.target.value)} placeholder="034 00 000 00" className={input} /></label>
         <label className="block text-sm font-medium">Email (facultatif)<input type="email" autoComplete="email" maxLength={254} value={email} disabled={busy} onChange={e => setEmail(e.target.value)} className={input} /></label>
         <div className="flex items-center justify-between border-t border-slate-200 pt-4 font-semibold"><span>Total des billets</span><span>{Number.isFinite(total) ? total.toLocaleString('fr-FR') : '—'} Ar</span></div>
         <p className="text-sm text-slate-600">Choisissez Mobile Money ou carte sur Papi. Vos billets seront disponibles après confirmation du paiement.</p>

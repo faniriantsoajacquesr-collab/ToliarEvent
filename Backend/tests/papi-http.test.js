@@ -9,6 +9,7 @@ const { once } = require('node:events');
 const { hashToken } = require('../services/papiClient');
 
 test('HTTP callbacks use raw signed bytes; tracking rejects forged access and URL success flags', async t => {
+  t.mock.method(require('../services/papiClient'), 'config', () => ({}));
   const token = 'a'.repeat(64), secret = 'pwhsec_local_test_only';
   const oldSecret = process.env.PAPI_WEBHOOK_SECRET;
   process.env.PAPI_WEBHOOK_SECRET = secret;
@@ -26,7 +27,14 @@ test('HTTP callbacks use raw signed bytes; tracking rejects forged access and UR
       };
       return q;
     },
-    async rpc() { if (row.status !== 'paid') completions++; row.status = 'paid'; return {}; },
+    async rpc(name, args) {
+      if (name === 'create_papi_checkout') {
+        assert.equal(args.p_buyer_phone, null);
+        return { data: { ...row } };
+      }
+      if (row.status !== 'paid') completions++;
+      row.status = 'paid'; return {};
+    },
   };
   const filename = path.resolve(__dirname, '../Controllers/papiController.js');
   const instance = new Module(filename, module);
@@ -40,10 +48,17 @@ test('HTTP callbacks use raw signed bytes; tracking rejects forged access and UR
   app.post('/notification', express.raw({ type: 'application/json' }), controller.notification);
   app.use(express.json());
   app.get('/checkouts/:id', controller.status);
+  app.post('/events/:id/checkout', controller.create);
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
+  const created = await fetch(`${base}/events/${randomUUID()}/checkout`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Checkout-Token': token },
+    body: JSON.stringify({ checkout_id: row.id, ticket_type_id: 1, quantity: 2, buyer_name: 'Client', accepted_terms: true }),
+  });
+  assert.equal(created.status, 201);
+  assert.equal(completions, 0);
   const get = value => fetch(`${base}/checkouts/${row.id}?success=true`, { headers: { 'X-Checkout-Token': value } });
   assert.equal((await get('')).status, 403);
   assert.equal((await get('b'.repeat(64))).status, 403);

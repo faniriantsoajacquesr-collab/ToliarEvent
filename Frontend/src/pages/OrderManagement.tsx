@@ -19,7 +19,7 @@ interface OrderTicket {
 interface OnlineOrder {
   id: string;
   buyer_name: string;
-  buyer_phone: string;
+  buyer_phone: string | null;
   buyer_email?: string | null;
   transaction_id: string;
   total_amount: number;
